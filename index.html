@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Loja Moderna VR - VQ3 Parte 3</title>
+  <title>Loja Moderna VR - VQ3 Parte 4 e 5 Segura</title>
 
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/aframe-extras@7.5.4/dist/aframe-extras.min.js"></script>
@@ -12,6 +12,7 @@
     let cart = [];
     let cartTotal = 0;
     let assistantLastMessage = '';
+    let audioUnlocked = false;
 
     const productPrices = {
       "Notebook X-Pro": 8499,
@@ -56,6 +57,29 @@
       }, delay);
     }
 
+    function unlockAudioAndPlayAmbient() {
+      if (audioUnlocked) return;
+      audioUnlocked = true;
+
+      const ambient = document.querySelector('#ambientSound');
+      if (ambient && ambient.components && ambient.components.sound) {
+        try {
+          ambient.components.sound.playSound();
+        } catch (e) {}
+      }
+    }
+
+    function playSound(id) {
+      unlockAudioAndPlayAmbient();
+      const el = document.querySelector(id);
+      if (el && el.components && el.components.sound) {
+        try {
+          el.components.sound.stopSound();
+          el.components.sound.playSound();
+        } catch (e) {}
+      }
+    }
+
     AFRAME.registerComponent('float-rotate', {
       schema: { yoffset: { default: 0.025 }, speed: { default: 1.0 }, rot: { default: 8 } },
       init: function () {
@@ -90,6 +114,9 @@
       },
       init: function () {
         this.el.addEventListener('click', () => {
+          unlockAudioAndPlayAmbient();
+          playSound('#clickSound');
+
           const productName = this.data.product;
           cart.push(productName);
           cartTotal += productPrices[productName] || 0;
@@ -111,6 +138,8 @@
       },
       init: function () {
         this.el.addEventListener('click', () => {
+          unlockAudioAndPlayAmbient();
+          playSound('#clickSound');
           setText('#infoTitle', this.data.title);
           setText('#infoBody', this.data.info);
           setText('#selectedPrice', 'Assistente online');
@@ -276,6 +305,9 @@
     AFRAME.registerComponent('finish-purchase', {
       init: function () {
         this.el.addEventListener('click', () => {
+          unlockAudioAndPlayAmbient();
+          playSound('#buySound');
+
           if (cart.length === 0) {
             setText('#checkoutStatus', 'Carrinho vazio');
             showMessage('Seu carrinho esta vazio.');
@@ -361,10 +393,45 @@
         }
       }
     });
+
+    AFRAME.registerComponent('hover-highlight', {
+      schema: {
+        glow: { type: 'selector' }
+      },
+      init: function () {
+        this.defaultScale = '1 1 1';
+
+        this.el.addEventListener('mouseenter', () => {
+          this.el.setAttribute('scale', '1.06 1.06 1.06');
+          if (this.data.glow) this.data.glow.setAttribute('visible', 'true');
+        });
+
+        this.el.addEventListener('mouseleave', () => {
+          this.el.setAttribute('scale', this.defaultScale);
+          if (this.data.glow) this.data.glow.setAttribute('visible', 'false');
+        });
+
+        this.el.addEventListener('click', () => {
+          this.el.setAttribute('animation__pulse', {
+            property: 'scale',
+            from: '1.0 1.0 1.0',
+            to: '1.12 1.12 1.12',
+            dur: 140,
+            dir: 'alternate',
+            loop: 1
+          });
+        });
+      }
+    });
   </script>
 </head>
 <body>
   <a-scene background="color: #06101a">
+
+    <!-- AUDIOS -->
+    <a-entity id="ambientSound" sound="src: url(https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8d1d09d.mp3?filename=futuristic-atmosphere-ambient-110997.mp3); autoplay: false; loop: true; volume: 0.25"></a-entity>
+    <a-entity id="clickSound" sound="src: url(https://cdn.pixabay.com/download/audio/2022/03/15/audio_7fa882ec58.mp3?filename=click-124467.mp3); autoplay: false; loop: false; volume: 0.6"></a-entity>
+    <a-entity id="buySound" sound="src: url(https://cdn.pixabay.com/download/audio/2022/03/10/audio_9420fd61d6.mp3?filename=success-fanfare-trumpets-6185.mp3); autoplay: false; loop: false; volume: 0.55"></a-entity>
 
     <a-sky color="#06101a"></a-sky>
 
@@ -443,7 +510,8 @@
     <a-box position="0 1.16 -2.92" width="7.35" height="0.12" depth="0.05" color="#8b5cf6"></a-box>
     <a-box position="0 0.18 -4.45" width="6.8" height="0.04" depth="2.6" color="#cbd5e1"></a-box>
 
-    <!-- PRODUTO 1 -->
+    <!-- PRODUTOS CENTRAIS COM GLOW -->
+    <a-circle id="glowNotebook" visible="false" position="-2.45 1.74 -4.45" radius="0.82" color="#38bdf8" opacity="0.20"></a-circle>
     <a-box position="-2.45 1.30 -4.45" width="1.9" height="0.06" depth="1.05" color="#94a3b8"></a-box>
     <a-entity position="-2.45 1.55 -4.45" float-rotate>
       <a-box width="1.24" height="0.06" depth="0.86" color="#334155"></a-box>
@@ -457,11 +525,12 @@
     <a-text value="Tela premium • Alto desempenho" position="-2.45 1.70 -2.99" align="center" color="#9db0c8" width="2.45"></a-text>
     <a-box position="-2.45 0.52 -2.20" width="1.70" height="0.40" depth="0.38" color="#0f766e"
       class="clickable"
+      hover-highlight="glow: #glowNotebook"
       product-card="product: Notebook X-Pro; price: R$ 8.499; info: Notebook com IA integrada, desempenho premium e tela de alta definicao para estudo, criacao e trabalho.">
     </a-box>
     <a-text value="Adicionar" position="-2.45 0.55 -2.00" align="center" color="#ffffff" width="2.5"></a-text>
 
-    <!-- PRODUTO 2 -->
+    <a-circle id="glowPhone" visible="false" position="0 1.74 -4.45" radius="0.70" color="#67e8f9" opacity="0.20"></a-circle>
     <a-box position="0 1.30 -4.45" width="1.55" height="0.06" depth="1.05" color="#94a3b8"></a-box>
     <a-entity position="0 1.53 -4.45" float-rotate="rot: 10">
       <a-box width="0.42" height="0.78" depth="0.05" color="#020617"></a-box>
@@ -474,11 +543,12 @@
     <a-text value="Design premium • Resposta rapida" position="0 1.70 -2.99" align="center" color="#9db0c8" width="2.55"></a-text>
     <a-box position="0 0.52 -2.20" width="1.70" height="0.40" depth="0.38" color="#1d4ed8"
       class="clickable"
+      hover-highlight="glow: #glowPhone"
       product-card="product: Phone Vision; price: R$ 5.999; info: Smartphone futurista com camera holografica, visual premium e conectividade inteligente.">
     </a-box>
     <a-text value="Adicionar" position="0 0.55 -2.00" align="center" color="#ffffff" width="2.5"></a-text>
 
-    <!-- PRODUTO 3 -->
+    <a-circle id="glowHeadphone" visible="false" position="2.45 1.74 -4.45" radius="0.78" color="#a78bfa" opacity="0.20"></a-circle>
     <a-box position="2.45 1.30 -4.45" width="1.9" height="0.06" depth="1.05" color="#94a3b8"></a-box>
     <a-entity position="2.45 1.58 -4.45" float-rotate>
       <a-torus radius="0.37" radius-tubular="0.07" color="#475569" rotation="90 0 0"></a-torus>
@@ -492,6 +562,7 @@
     <a-text value="Cancelamento de ruido premium" position="2.45 1.70 -2.99" align="center" color="#9db0c8" width="2.55"></a-text>
     <a-box position="2.45 0.52 -2.20" width="1.70" height="0.40" depth="0.38" color="#7c3aed"
       class="clickable"
+      hover-highlight="glow: #glowHeadphone"
       product-card="product: Headphone Neo; price: R$ 1.499; info: Headphone com audio imersivo, cancelamento de ruido e design sofisticado para musica e VR.">
     </a-box>
     <a-text value="Adicionar" position="2.45 0.55 -2.00" align="center" color="#ffffff" width="2.5"></a-text>
@@ -554,7 +625,6 @@
     </a-box>
     <a-text value="Adicionar" position="-5.72 2.26 -7.54" align="center" color="#ffffff" width="1.9"></a-text>
 
-    <!-- PRATELEIRA DIREITA -->
     <a-box position="6.4 1.55 -8.4" width="3.4" height="3.35" depth="0.72" color="#182232"></a-box>
     <a-box position="6.4 0.20 -8.4" width="3.6" height="0.08" depth="0.92" color="#8b5cf6"></a-box>
     <a-box position="6.4 1.15 -8.4" width="3.6" height="0.08" depth="0.92" color="#8b5cf6"></a-box>
@@ -664,7 +734,7 @@
     <a-text id="cartCount" value="0 itens" position="5.2 2.10 -12.74" align="center" color="#94a3b8" width="3.4"></a-text>
     <a-text id="cartTotal" value="Total: R$ 0" position="5.2 1.62 -12.74" align="center" color="#7dd3fc" width="3.8"></a-text>
 
-    <!-- CAIXA MELHORADO -->
+    <!-- CAIXA -->
     <a-entity position="0 0 -10.9">
       <a-box position="0 1.0 0" width="5.4" height="2.4" depth="2.05" color="#0f172a"></a-box>
       <a-box position="0 2.10 0.82" width="1.75" height="1.08" depth="0.05" color="#020617"></a-box>
@@ -675,13 +745,11 @@
       <a-text id="payBadge" value="Pagamento facial" position="0 3.12 0.50" align="center" color="#7dd3fc" width="6"></a-text>
       <a-text id="scanStatus" value="Fique na area verde" position="0 0.38 1.08" align="center" color="#e8eef8" width="5.2"></a-text>
 
-      <!-- RESUMO DA COMPRA -->
       <a-box position="-2.05 1.28 0.80" width="1.65" height="1.45" depth="0.04" color="#111827"></a-box>
       <a-text value="Resumo" position="-2.05 1.88 0.92" align="center" color="#c4b5fd" width="2.2"></a-text>
       <a-text id="checkoutList" value="Nenhum item selecionado" position="-2.05 1.40 0.92" align="center" color="#eef5ff" width="1.9"></a-text>
       <a-text id="checkoutStatus" value="Aguardando compra" position="-2.05 0.88 0.92" align="center" color="#94a3b8" width="1.9"></a-text>
 
-      <!-- TOTAL -->
       <a-box position="2.05 1.28 0.80" width="1.65" height="1.45" depth="0.04" color="#111827"></a-box>
       <a-text value="Pagamento" position="2.05 1.88 0.92" align="center" color="#7dd3fc" width="2.2"></a-text>
       <a-text id="checkoutTotal" value="Aproxime-se" position="2.05 1.40 0.92" align="center" color="#eef5ff" width="1.9"></a-text>
@@ -719,7 +787,7 @@
       color="#eef5ff"
       width="7.4"></a-text>
 
-    <!-- RIG COM ANALOGICO -->
+    <!-- RIG -->
     <a-entity id="rig"
       position="0 1.6 5"
       movement-controls="speed: 0.20; controls: checkpoint, gamepad, keyboard">
@@ -766,6 +834,9 @@
     setInterval(() => {
       setText('#checkoutTotal', cart.length === 0 ? 'Aproxime-se' : formatBRL(cartTotal));
     }, 200);
+
+    document.addEventListener('click', unlockAudioAndPlayAmbient, { once: true });
+    document.addEventListener('touchstart', unlockAudioAndPlayAmbient, { once: true });
   </script>
 </body>
 </html>
