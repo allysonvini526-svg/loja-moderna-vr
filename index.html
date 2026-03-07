@@ -3,8 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Loja Moderna VR - V5.2.1</title>
+  <title>Loja Moderna VR - V5.3</title>
+
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
 
   <script>
     let cart = [];
@@ -28,7 +30,7 @@
       setText('#globalMessage', text);
       clearTimeout(window.__msgTimer);
       window.__msgTimer = setTimeout(() => {
-        setText('#globalMessage', 'Clique ou olhe para os produtos e botoes para interagir.');
+        setText('#globalMessage', 'Use os controles do VR ou clique nos botoes para interagir.');
       }, delay);
     }
 
@@ -256,7 +258,7 @@
     <a-ring position="0 2.5 -12.79" radius-inner="1.20" radius-outer="1.34" color="#8b5cf6"></a-ring>
     <a-text value="EXPERIENCIA IMERSIVA" position="0 4.00 -12.72" align="center" color="#e6eef8" width="7"></a-text>
 
-    <!-- TV NA PAREDE DA FRENTE -->
+    <!-- TV -->
     <a-box position="0 2.55 2.82" width="5.8" height="2.35" depth="0.08" color="#020617"></a-box>
     <a-plane position="0 2.55 2.77" width="5.45" height="2.0" color="#0f172a" rotation="0 180 0" material="side: double" tv-showcase></a-plane>
     <a-text id="tvTitle" value="Notebook X-Pro" position="0 2.85 2.70" align="center" color="#7dd3fc" width="6.2" rotation="0 180 0"></a-text>
@@ -322,7 +324,7 @@
     </a-box>
     <a-text value="Adicionar" position="2.45 0.55 -2.00" align="center" color="#ffffff" width="2.5"></a-text>
 
-    <!-- PRATELEIRA ESQUERDA -->
+    <!-- PRATELEIRAS -->
     <a-box position="-6.4 1.55 -8.4" width="3.4" height="3.35" depth="0.72" color="#182232"></a-box>
     <a-box position="-6.4 0.20 -8.4" width="3.6" height="0.08" depth="0.92" color="#38bdf8"></a-box>
     <a-box position="-6.4 1.15 -8.4" width="3.6" height="0.08" depth="0.92" color="#38bdf8"></a-box>
@@ -380,7 +382,6 @@
     </a-box>
     <a-text value="Adicionar" position="-5.72 2.26 -7.54" align="center" color="#ffffff" width="1.9"></a-text>
 
-    <!-- PRATELEIRA DIREITA -->
     <a-box position="6.4 1.55 -8.4" width="3.4" height="3.35" depth="0.72" color="#182232"></a-box>
     <a-box position="6.4 0.20 -8.4" width="3.6" height="0.08" depth="0.92" color="#8b5cf6"></a-box>
     <a-box position="6.4 1.15 -8.4" width="3.6" height="0.08" depth="0.92" color="#8b5cf6"></a-box>
@@ -461,7 +462,7 @@
     <a-text value="Assistente Virtual" position="3.9 2.43 -6.2" align="center" color="#7dd3fc" width="4"></a-text>
     <a-text value="Toque para receber ajuda" position="3.9 2.16 -6.2" align="center" color="#cfd9e8" width="3.8"></a-text>
 
-    <!-- PAINEL DE INFORMACOES -->
+    <!-- PAINEIS -->
     <a-box position="-5.2 2.18 -12.85" width="5.2" height="2.7" depth="0.06" color="#020617"></a-box>
     <a-text id="infoTitle" value="Bem-vindo" position="-5.2 3.02 -12.74" align="center" color="#7dd3fc" width="4.8"></a-text>
     <a-text id="infoBody"
@@ -472,13 +473,12 @@
       width="4.9"></a-text>
     <a-text id="selectedPrice" value="Selecione um produto" position="-5.2 1.82 -12.74" align="center" color="#94a3b8" width="3.8"></a-text>
 
-    <!-- CARRINHO -->
     <a-box position="5.2 2.18 -12.85" width="5.0" height="2.7" depth="0.06" color="#020617"></a-box>
     <a-text value="Carrinho virtual" position="5.2 3.02 -12.74" align="center" color="#c4b5fd" width="4.5"></a-text>
     <a-text id="cartItems" value="Carrinho vazio" position="5.2 2.42 -12.74" align="center" color="#e8eef8" width="4.6"></a-text>
     <a-text id="cartCount" value="0 itens" position="5.2 1.82 -12.74" align="center" color="#94a3b8" width="3.4"></a-text>
 
-    <!-- CAIXA FACIAL -->
+    <!-- CAIXA -->
     <a-entity position="0 0 -10.9">
       <a-box position="0 1.0 0" width="4.8" height="2.05" depth="1.95" color="#0f172a"></a-box>
       <a-box position="0 2.02 0.80" width="1.55" height="1.02" depth="0.05" color="#020617"></a-box>
@@ -541,28 +541,49 @@
 
     <!-- MENSAGEM -->
     <a-text id="globalMessage"
-      value="Clique ou olhe para os produtos e botoes para interagir."
+      value="Use os controles do VR ou clique nos botoes para interagir."
       position="0 3.25 -1.70"
       align="center"
       color="#eef5ff"
       width="7.4"></a-text>
 
-    <!-- CAMERA -->
-    <a-entity id="rig" position="0 1.6 5">
-      <a-camera wasd-controls="acceleration: 18" look-controls="pointerLockEnabled: true">
+    <!-- RIG VR MELHORADO -->
+    <a-entity id="rig" position="0 1.6 5" movement-controls="speed: 0.22">
+      <a-entity id="cameraHolder" position="0 0 0">
         <a-entity
-          cursor="fuse: true; fuseTimeout: 1000"
-          raycaster="objects: .clickable"
-          position="0 0 -1"
-          geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.016"
-          material="color: white; shader: flat">
-        </a-entity>
+          camera
+          look-controls
+          position="0 0 0">
+          
+          <!-- cursor gaze -->
+          <a-entity
+            cursor="fuse: true; fuseTimeout: 900"
+            raycaster="objects: .clickable"
+            position="0 0 -1"
+            geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.016"
+            material="color: white; shader: flat">
+          </a-entity>
 
-        <a-entity
-          cursor="rayOrigin: mouse"
-          raycaster="objects: .clickable">
+          <!-- cursor mouse para desktop -->
+          <a-entity
+            cursor="rayOrigin: mouse"
+            raycaster="objects: .clickable">
+          </a-entity>
         </a-entity>
-      </a-camera>
+      </a-entity>
+
+      <!-- controles VR -->
+      <a-entity
+        laser-controls="hand: left"
+        raycaster="objects: .clickable"
+        line="color: #7dd3fc">
+      </a-entity>
+
+      <a-entity
+        laser-controls="hand: right"
+        raycaster="objects: .clickable"
+        line="color: #c4b5fd">
+      </a-entity>
     </a-entity>
 
   </a-scene>
