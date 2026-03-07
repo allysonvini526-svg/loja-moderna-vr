@@ -1,618 +1,163 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Loja Moderna VR - VQ1 Meta Quest</title>
+<meta charset="UTF-8">
+<title>Loja Moderna VR</title>
 
-  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+<script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/aframe-extras@7.5.4/dist/aframe-extras.min.js"></script>
 
-  <script>
-    let cart = [];
+<script>
+let cart=[];
 
-    function setText(id, value) {
-      const el = document.querySelector(id);
-      if (el) el.setAttribute('value', value);
-    }
+function addItem(name){
+cart.push(name);
+document.querySelector("#cart").setAttribute("value","Carrinho: "+cart.join(", "));
+}
 
-    function updateCart() {
-      if (cart.length === 0) {
-        setText('#cartText', 'Carrinho vazio');
-      } else {
-        setText('#cartText', 'Carrinho: ' + cart.join(' • '));
-      }
-    }
+function buy(){
+if(cart.length==0){
+document.querySelector("#info").setAttribute("value","Carrinho vazio");
+return;
+}
 
-    function showMessage(text) {
-      setText('#messageText', text);
-      clearTimeout(window.msgTimer);
-      window.msgTimer = setTimeout(() => {
-        setText('#messageText', 'Aponte para produtos ou botoes e aperte o gatilho.');
-      }, 2500);
-    }
+document.querySelector("#info").setAttribute("value","Compra aprovada ✔");
+cart=[];
+document.querySelector("#cart").setAttribute("value","Carrinho vazio");
+}
+</script>
 
-    AFRAME.registerComponent('buy-item', {
-      schema: {
-        product: { type: 'string' },
-        info: { type: 'string' }
-      },
-      init: function () {
-        this.el.addEventListener('click', () => {
-          cart.push(this.data.product);
-          updateCart();
-          setText('#infoTitle', this.data.product);
-          setText('#infoBody', this.data.info);
-          showMessage(this.data.product + ' adicionado ao carrinho!');
-        });
-      }
-    });
-
-    AFRAME.registerComponent('finish-purchase', {
-      init: function () {
-        this.el.addEventListener('click', () => {
-          if (cart.length === 0) {
-            showMessage('Seu carrinho esta vazio.');
-            return;
-          }
-
-          setText('#infoTitle', 'Compra aprovada');
-          setText('#infoBody', 'Itens: ' + cart.join(', '));
-          showMessage('Compra finalizada com sucesso!');
-          cart = [];
-          updateCart();
-
-          const ok = document.querySelector('#okBadge');
-          if (ok) {
-            ok.setAttribute('visible', 'true');
-            setTimeout(() => ok.setAttribute('visible', 'false'), 2200);
-          }
-        });
-      }
-    });
-
-    AFRAME.registerComponent('assistant-help', {
-      init: function () {
-        this.el.addEventListener('click', () => {
-          setText('#infoTitle', 'Assistente Virtual');
-          setText('#infoBody', 'Use o laser do controle para apontar. Aperte o gatilho para adicionar produtos. Va ao caixa para finalizar.');
-          showMessage('Assistente virtual ativado.');
-        });
-      }
-    });
-
-    AFRAME.registerComponent('teleport-to', {
-      schema: {
-        x: { type: 'number' },
-        y: { type: 'number', default: 1.6 },
-        z: { type: 'number' }
-      },
-      init: function () {
-        this.el.addEventListener('click', () => {
-          const rig = document.querySelector('#rig');
-          if (rig) {
-            rig.setAttribute('position', `${this.data.x} ${this.data.y} ${this.data.z}`);
-          }
-        });
-      }
-    });
-
-    AFRAME.registerComponent('float-gentle', {
-      schema: {
-        amount: { default: 0.03 },
-        speed: { default: 1.0 }
-      },
-      init: function () {
-        this.baseY = this.el.object3D.position.y;
-      },
-      tick: function (time) {
-        this.el.object3D.position.y =
-          this.baseY + Math.sin(time / 700 * this.data.speed) * this.data.amount;
-      }
-    });
-  </script>
 </head>
+
 <body>
-  <a-scene background="color: #08111d">
 
-    <!-- Luz -->
-    <a-light type="ambient" intensity="0.7" color="#dbeafe"></a-light>
-    <a-light type="point" intensity="0.5" position="0 4 -4" color="#7dd3fc"></a-light>
-    <a-light type="point" intensity="0.3" position="0 4 -10" color="#a78bfa"></a-light>
+<a-scene background="color:#07101b">
 
-    <!-- Fundo -->
-    <a-sky color="#08111d"></a-sky>
+<a-light type="ambient" intensity="0.8"></a-light>
+<a-light type="point" position="0 4 -4" intensity="0.6"></a-light>
 
-    <!-- Piso -->
-    <a-plane position="0 0 -6" rotation="-90 0 0" width="18" height="18" color="#0f172a"></a-plane>
-    <a-plane position="0 0.01 -6" rotation="-90 0 0" width="14" height="14" color="#111c2f"></a-plane>
+<a-sky color="#07101b"></a-sky>
 
-    <!-- Loja -->
-    <a-box position="0 2.5 -13" width="14" height="5" depth="0.2" color="#14294f"></a-box>
-    <a-box position="-7 2.5 -6" width="0.2" height="5" depth="14" color="#17356b"></a-box>
-    <a-box position="7 2.5 -6" width="0.2" height="5" depth="14" color="#232f63"></a-box>
-    <a-plane position="0 5 -6" rotation="90 0 0" width="14" height="14" color="#0c1628"></a-plane>
+<a-plane rotation="-90 0 0" width="20" height="20" color="#111827"></a-plane>
 
-    <!-- Letreiro -->
-    <a-box position="0 4.3 0.6" width="6" height="0.8" depth="0.1" color="#020617"></a-box>
-    <a-text value="LOJA MODERNA VR"
-            position="0 4.2 0.45"
-            align="center"
-            color="#7dd3fc"
-            width="8">
-    </a-text>
+<a-box position="0 2.5 -10" width="20" height="5" depth="0.2" color="#14294f"></a-box>
 
-    <!-- Painel de ajuda -->
-    <a-box position="0 2.5 -1.4" width="4.6" height="1.4" depth="0.08" color="#020617"></a-box>
-    <a-text id="messageText"
-            value="Aponte para produtos ou botoes e aperte o gatilho."
-            position="0 2.65 -1.3"
-            align="center"
-            color="#eef5ff"
-            width="4.2">
-    </a-text>
+<!-- TV -->
+<a-box position="0 2.7 -9.8" width="6" height="2" depth="0.1" color="black"></a-box>
+<a-text value="DESTAQUES DA LOJA" position="0 3.4 -9.7" align="center" width="6"></a-text>
 
-    <!-- Mesa central -->
-    <a-box position="0 0.8 -5.3" width="7" height="1.6" depth="2.2" color="#dbe4f0"></a-box>
-    <a-box position="0 1.62 -5.3" width="7.1" height="0.08" depth="2.3" color="#67e8f9"></a-box>
+<!-- mesa -->
+<a-box position="0 0.8 -5" width="7" height="1.5" depth="2" color="#e5e7eb"></a-box>
 
-    <!-- Produto 1 -->
-    <a-box position="-2.3 1.35 -5.3" width="1.4" height="0.05" depth="0.9" color="#64748b"></a-box>
-    <a-entity position="-2.3 1.65 -5.3" float-gentle>
-      <a-box width="1.0" height="0.05" depth="0.7" color="#334155"></a-box>
-      <a-plane position="0 0.34 -0.2" width="0.9" height="0.55" color="#38bdf8" rotation="-35 0 0"></a-plane>
-    </a-entity>
-    <a-plane position="-2.3 2.2 -4.1" width="2.0" height="0.9" color="#08111d" opacity="0.95"></a-plane>
-    <a-text value="Notebook X-Pro"
-            position="-2.3 2.38 -4.0"
-            align="center"
-            color="#ffffff"
-            width="2.8"></a-text>
-    <a-text value="R$ 8.499"
-            position="-2.3 2.16 -4.0"
-            align="center"
-            color="#7dd3fc"
-            width="2.4"></a-text>
-    <a-text value="IA integrada"
-            position="-2.3 1.96 -4.0"
-            align="center"
-            color="#cbd5e1"
-            width="2.1"></a-text>
-    <a-box position="-2.3 0.45 -3.95"
-           width="1.6"
-           height="0.4"
-           depth="0.35"
-           color="#0f766e"
-           class="clickable"
-           buy-item="product: Notebook X-Pro; info: Notebook premium com IA integrada e alta performance.">
-    </a-box>
-    <a-text value="Adicionar"
-            position="-2.3 0.49 -3.77"
-            align="center"
-            color="#ffffff"
-            width="2.4"></a-text>
+<!-- produto 1 -->
+<a-box position="-2 1.6 -5" depth="0.6" height="0.05" width="1" color="#334155"></a-box>
 
-    <!-- Produto 2 -->
-    <a-box position="0 1.35 -5.3" width="1.2" height="0.05" depth="0.9" color="#64748b"></a-box>
-    <a-entity position="0 1.62 -5.3" float-gentle>
-      <a-box width="0.35" height="0.7" depth="0.05" color="#020617"></a-box>
-      <a-plane position="0 0 0.03" width="0.28" height="0.52" color="#67e8f9"></a-plane>
-    </a-entity>
-    <a-plane position="0 2.2 -4.1" width="2.0" height="0.9" color="#08111d" opacity="0.95"></a-plane>
-    <a-text value="Phone Vision"
-            position="0 2.38 -4.0"
-            align="center"
-            color="#ffffff"
-            width="2.8"></a-text>
-    <a-text value="R$ 5.999"
-            position="0 2.16 -4.0"
-            align="center"
-            color="#7dd3fc"
-            width="2.4"></a-text>
-    <a-text value="Holografico"
-            position="0 1.96 -4.0"
-            align="center"
-            color="#cbd5e1"
-            width="2.1"></a-text>
-    <a-box position="0 0.45 -3.95"
-           width="1.6"
-           height="0.4"
-           depth="0.35"
-           color="#1d4ed8"
-           class="clickable"
-           buy-item="product: Phone Vision; info: Smartphone futurista com camera holografica e resposta rapida.">
-    </a-box>
-    <a-text value="Adicionar"
-            position="0 0.49 -3.77"
-            align="center"
-            color="#ffffff"
-            width="2.4"></a-text>
+<a-box position="-2 1.8 -5" depth="0.2" height="0.4" width="0.6" color="#111827"></a-box>
 
-    <!-- Produto 3 -->
-    <a-box position="2.3 1.35 -5.3" width="1.4" height="0.05" depth="0.9" color="#64748b"></a-box>
-    <a-entity position="2.3 1.65 -5.3" float-gentle>
-      <a-torus radius="0.28" radius-tubular="0.06" color="#475569" rotation="90 0 0"></a-torus>
-      <a-sphere position="-0.2 -0.14 0" radius="0.1" color="#0f172a"></a-sphere>
-      <a-sphere position="0.2 -0.14 0" radius="0.1" color="#0f172a"></a-sphere>
-    </a-entity>
-    <a-plane position="2.3 2.2 -4.1" width="2.0" height="0.9" color="#08111d" opacity="0.95"></a-plane>
-    <a-text value="Headphone Neo"
-            position="2.3 2.38 -4.0"
-            align="center"
-            color="#ffffff"
-            width="2.8"></a-text>
-    <a-text value="R$ 1.499"
-            position="2.3 2.16 -4.0"
-            align="center"
-            color="#7dd3fc"
-            width="2.4"></a-text>
-    <a-text value="Som imersivo"
-            position="2.3 1.96 -4.0"
-            align="center"
-            color="#cbd5e1"
-            width="2.1"></a-text>
-    <a-box position="2.3 0.45 -3.95"
-           width="1.6"
-           height="0.4"
-           depth="0.35"
-           color="#7c3aed"
-           class="clickable"
-           buy-item="product: Headphone Neo; info: Headphone premium com som imersivo e cancelamento de ruido.">
-    </a-box>
-    <a-text value="Adicionar"
-            position="2.3 0.49 -3.77"
-            align="center"
-            color="#ffffff"
-            width="2.4"></a-text>
+<a-box class="clickable"
+onclick="addItem('Notebook')"
+position="-2 0.6 -4.3"
+width="1.4"
+height="0.4"
+depth="0.3"
+color="#059669">
+</a-box>
 
-    <!-- Teleportes -->
-    <a-circle position="0 0.03 -2.5"
-              rotation="-90 0 0"
-              radius="0.5"
-              color="#38bdf8"
-              opacity="0.9"
-              class="clickable"
-              teleport-to="x: 0; y: 1.6; z: -2.5">
-    </a-circle>
+<a-text value="Notebook R$8499"
+position="-2 2.2 -4.2"
+align="center"></a-text>
 
-    <a-circle position="0 0.03 -7.2"
-              rotation="-90 0 0"
-              radius="0.5"
-              color="#8b5cf6"
-              opacity="0.9"
-              class="clickable"
-              teleport-to="x: 0; y: 1.6; z: -7.2">
-    </a-circle>
+<!-- produto 2 -->
+<a-box position="0 1.6 -5" depth="0.6" height="0.05" width="1" color="#334155"></a-box>
 
-    <a-circle position="0 0.03 -10.0"
-              rotation="-90 0 0"
-              radius="0.5"
-              color="#14b8a6"
-              opacity="0.9"
-              class="clickable"
-              teleport-to="x: 0; y: 1.6; z: -10.0">
-    </a-circle>
+<a-box position="0 1.9 -5" depth="0.1" height="0.6" width="0.3" color="black"></a-box>
 
-    <a-text value="Entrada"
-            position="0 0.08 -2.5"
-            rotation="-90 0 0"
-            align="center"
-            color="#ffffff"
-            width="2"></a-text>
+<a-box class="clickable"
+onclick="addItem('Phone')"
+position="0 0.6 -4.3"
+width="1.4"
+height="0.4"
+depth="0.3"
+color="#2563eb">
+</a-box>
 
-    <a-text value="Produtos"
-            position="0 0.08 -7.2"
-            rotation="-90 0 0"
-            align="center"
-            color="#ffffff"
-            width="2"></a-text>
+<a-text value="Phone R$5999"
+position="0 2.2 -4.2"
+align="center"></a-text>
 
-    <a-text value="Caixa"
-            position="0 0.08 -10.0"
-            rotation="-90 0 0"
-            align="center"
-            color="#ffffff"
-            width="2"></a-text>
+<!-- produto 3 -->
+<a-box position="2 1.6 -5" depth="0.6" height="0.05" width="1" color="#334155"></a-box>
 
-    <!-- Prateleira esquerda -->
-    <a-box position="-5.3 1.6 -9.5" width="2.8" height="3.0" depth="0.6" color="#182232"></a-box>
-    <a-box position="-5.3 0.25 -9.5" width="3.0" height="0.06" depth="0.8" color="#38bdf8"></a-box>
-    <a-box position="-5.3 1.2 -9.5" width="3.0" height="0.06" depth="0.8" color="#38bdf8"></a-box>
-    <a-box position="-5.3 2.15 -9.5" width="3.0" height="0.06" depth="0.8" color="#38bdf8"></a-box>
+<a-sphere position="2 1.9 -5" radius="0.3" color="#111827"></a-sphere>
 
-    <a-entity position="-6.0 0.72 -9.5" float-gentle>
-      <a-torus radius="0.16" radius-tubular="0.04" color="#111827" rotation="90 0 0"></a-torus>
-      <a-sphere position="-0.1 -0.08 0" radius="0.06" color="#67e8f9"></a-sphere>
-      <a-sphere position="0.1 -0.08 0" radius="0.06" color="#67e8f9"></a-sphere>
-    </a-entity>
-    <a-text value="Earbuds Air"
-            position="-6.0 1.05 -9.0"
-            align="center"
-            color="#ffffff"
-            width="2.1"></a-text>
-    <a-box position="-6.0 0.35 -8.95"
-           width="1.1"
-           height="0.24"
-           depth="0.24"
-           color="#0f766e"
-           class="clickable"
-           buy-item="product: Earbuds Air; info: Fones sem fio compactos para uso diario.">
-    </a-box>
-    <a-text value="R$ 899"
-            position="-6.0 0.38 -8.8"
-            align="center"
-            color="#ffffff"
-            width="1.8"></a-text>
+<a-box class="clickable"
+onclick="addItem('Headphone')"
+position="2 0.6 -4.3"
+width="1.4"
+height="0.4"
+depth="0.3"
+color="#7c3aed">
+</a-box>
 
-    <a-entity position="-5.3 1.65 -9.5" float-gentle>
-      <a-cylinder radius="0.15" height="0.24" color="#020617"></a-cylinder>
-    </a-entity>
-    <a-text value="Speaker Orb"
-            position="-5.3 1.95 -9.0"
-            align="center"
-            color="#ffffff"
-            width="2.1"></a-text>
-    <a-box position="-5.3 1.35 -8.95"
-           width="1.1"
-           height="0.24"
-           depth="0.24"
-           color="#1d4ed8"
-           class="clickable"
-           buy-item="product: Speaker Orb; info: Caixa de som inteligente com graves marcantes.">
-    </a-box>
-    <a-text value="R$ 1.299"
-            position="-5.3 1.38 -8.8"
-            align="center"
-            color="#ffffff"
-            width="1.8"></a-text>
+<a-text value="Headphone R$1499"
+position="2 2.2 -4.2"
+align="center"></a-text>
 
-    <a-entity position="-4.6 2.58 -9.5" float-gentle>
-      <a-box width="0.52" height="0.30" depth="0.06" color="#111827"></a-box>
-      <a-plane position="0 0 0.04" width="0.38" height="0.18" color="#67e8f9"></a-plane>
-    </a-entity>
-    <a-text value="Smart Display"
-            position="-4.6 2.88 -9.0"
-            align="center"
-            color="#ffffff"
-            width="2.1"></a-text>
-    <a-box position="-4.6 2.28 -8.95"
-           width="1.1"
-           height="0.24"
-           depth="0.24"
-           color="#7c3aed"
-           class="clickable"
-           buy-item="product: Smart Display; info: Tela inteligente para automacao e chamadas.">
-    </a-box>
-    <a-text value="R$ 2.199"
-            position="-4.6 2.31 -8.8"
-            align="center"
-            color="#ffffff"
-            width="1.8"></a-text>
+<!-- assistente -->
+<a-cylinder position="0 1 -7.5" radius="0.2" height="1.2" color="#9ca3af"></a-cylinder>
+<a-sphere position="0 1.7 -7.5" radius="0.25" color="#e5e7eb"></a-sphere>
 
-    <!-- Prateleira direita -->
-    <a-box position="5.3 1.6 -9.5" width="2.8" height="3.0" depth="0.6" color="#182232"></a-box>
-    <a-box position="5.3 0.25 -9.5" width="3.0" height="0.06" depth="0.8" color="#8b5cf6"></a-box>
-    <a-box position="5.3 1.2 -9.5" width="3.0" height="0.06" depth="0.8" color="#8b5cf6"></a-box>
-    <a-box position="5.3 2.15 -9.5" width="3.0" height="0.06" depth="0.8" color="#8b5cf6"></a-box>
+<a-text value="Assistente VR"
+position="0 2.3 -7.5"
+align="center"></a-text>
 
-    <a-entity position="4.6 0.72 -9.5" float-gentle>
-      <a-box width="0.32" height="0.58" depth="0.08" color="#0f172a"></a-box>
-      <a-plane position="0 0 0.045" width="0.22" height="0.42" color="#67e8f9"></a-plane>
-    </a-entity>
-    <a-text value="Mini Phone"
-            position="4.6 1.05 -9.0"
-            align="center"
-            color="#ffffff"
-            width="2.1"></a-text>
-    <a-box position="4.6 0.35 -8.95"
-           width="1.1"
-           height="0.24"
-           depth="0.24"
-           color="#0891b2"
-           class="clickable"
-           buy-item="product: Mini Phone; info: Smartphone compacto e rapido.">
-    </a-box>
-    <a-text value="R$ 3.499"
-            position="4.6 0.38 -8.8"
-            align="center"
-            color="#ffffff"
-            width="1.8"></a-text>
+<!-- caixa -->
+<a-box position="0 1 -9" width="3" height="1.5" depth="1" color="#0f172a"></a-box>
 
-    <a-entity position="5.3 1.62 -9.5" float-gentle>
-      <a-box width="0.46" height="0.16" depth="0.24" color="#111827"></a-box>
-      <a-ring position="-0.16 0 0.13" radius-inner="0.05" radius-outer="0.09" color="#67e8f9"></a-ring>
-      <a-ring position="0.16 0 0.13" radius-inner="0.05" radius-outer="0.09" color="#67e8f9"></a-ring>
-    </a-entity>
-    <a-text value="VR Pod"
-            position="5.3 1.95 -9.0"
-            align="center"
-            color="#ffffff"
-            width="2.1"></a-text>
-    <a-box position="5.3 1.35 -8.95"
-           width="1.1"
-           height="0.24"
-           depth="0.24"
-           color="#1d4ed8"
-           class="clickable"
-           buy-item="product: VR Pod; info: Modulo de realidade virtual portatil.">
-    </a-box>
-    <a-text value="R$ 3.299"
-            position="5.3 1.38 -8.8"
-            align="center"
-            color="#ffffff"
-            width="1.8"></a-text>
+<a-box class="clickable"
+onclick="buy()"
+position="0 0.4 -8.2"
+width="2"
+height="0.4"
+depth="0.3"
+color="#16a34a"></a-box>
 
-    <a-entity position="6.0 2.58 -9.5" float-gentle>
-      <a-torus radius="0.16" radius-tubular="0.04" color="#111827" rotation="90 0 0"></a-torus>
-      <a-sphere position="-0.1 -0.08 0" radius="0.06" color="#c4b5fd"></a-sphere>
-      <a-sphere position="0.1 -0.08 0" radius="0.06" color="#c4b5fd"></a-sphere>
-    </a-entity>
-    <a-text value="Pulse Buds"
-            position="6.0 2.88 -9.0"
-            align="center"
-            color="#ffffff"
-            width="2.1"></a-text>
-    <a-box position="6.0 2.28 -8.95"
-           width="1.1"
-           height="0.24"
-           depth="0.24"
-           color="#7c3aed"
-           class="clickable"
-           buy-item="product: Pulse Buds; info: Fones com audio adaptativo e resposta rapida.">
-    </a-box>
-    <a-text value="R$ 999"
-            position="6.0 2.31 -8.8"
-            align="center"
-            color="#ffffff"
-            width="1.8"></a-text>
+<a-text value="Finalizar compra"
+position="0 0.45 -8"
+align="center"></a-text>
 
-    <!-- Caixa -->
-    <a-box position="0 1.0 -11.4" width="4.4" height="1.9" depth="1.6" color="#0f172a"></a-box>
-    <a-box position="0 2.0 -10.7" width="1.3" height="0.85" depth="0.05" color="#020617"></a-box>
-    <a-plane position="0 2.0 -10.66" width="1.12" height="0.68" color="#67e8f9"></a-plane>
-    <a-text value="Pagamento Facial"
-            position="0 2.8 -10.85"
-            align="center"
-            color="#7dd3fc"
-            width="4.6"></a-text>
+<!-- painéis -->
+<a-text id="cart"
+value="Carrinho vazio"
+position="4 2 -8"
+width="4"></a-text>
 
-    <a-ring position="0 0.03 -9.7"
-            rotation="-90 0 0"
-            radius-inner="0.55"
-            radius-outer="0.8"
-            color="#86efac"
-            opacity="0.95"
-            class="clickable"
-            teleport-to="x: 0; y: 1.6; z: -9.7">
-    </a-ring>
+<a-text id="info"
+value="Aponte e aperte o gatilho"
+position="-4 2 -8"
+width="4"></a-text>
 
-    <a-text value="Fique aqui"
-            position="0 0.08 -9.7"
-            rotation="-90 0 0"
-            align="center"
-            color="#ffffff"
-            width="2"></a-text>
+<!-- RIG COM ANALOGICO -->
+<a-entity
+id="rig"
+position="0 1.6 0"
+movement-controls="speed:0.2">
 
-    <a-box position="0 0.4 -10.0"
-           width="2.2"
-           height="0.45"
-           depth="0.35"
-           color="#0f766e"
-           class="clickable"
-           finish-purchase>
-    </a-box>
-    <a-text value="Finalizar compra"
-            position="0 0.44 -9.82"
-            align="center"
-            color="#ffffff"
-            width="3.2"></a-text>
+<a-entity camera look-controls></a-entity>
 
-    <a-circle id="okBadge"
-              visible="false"
-              position="0 1.1 -10.0"
-              radius="0.5"
-              color="#16a34a">
-    </a-circle>
-    <a-text value="✓"
-            visible="false"
-            id="okText"
-            position="0 1.1 -9.9"
-            align="center"
-            color="#ffffff"
-            width="4"></a-text>
+<a-entity
+laser-controls="hand: left"
+raycaster="objects: .clickable">
+</a-entity>
 
-    <!-- Painel de info -->
-    <a-box position="-4.2 2.2 -12.2" width="4.2" height="2.2" depth="0.06" color="#020617"></a-box>
-    <a-text id="infoTitle"
-            value="Bem-vindo"
-            position="-4.2 2.9 -12.1"
-            align="center"
-            color="#7dd3fc"
-            width="4"></a-text>
-    <a-text id="infoBody"
-            value="Explore os produtos, aponte com o controle e use o gatilho."
-            position="-4.2 2.35 -12.1"
-            align="center"
-            color="#eef5ff"
-            width="4.1"></a-text>
+<a-entity
+laser-controls="hand: right"
+raycaster="objects: .clickable">
+</a-entity>
 
-    <!-- Carrinho -->
-    <a-box position="4.2 2.2 -12.2" width="4.2" height="2.2" depth="0.06" color="#020617"></a-box>
-    <a-text value="Carrinho"
-            position="4.2 2.9 -12.1"
-            align="center"
-            color="#c4b5fd"
-            width="4"></a-text>
-    <a-text id="cartText"
-            value="Carrinho vazio"
-            position="4.2 2.35 -12.1"
-            align="center"
-            color="#eef5ff"
-            width="4.1"></a-text>
+</a-entity>
 
-    <!-- Assistente -->
-    <a-entity class="clickable" position="0 0 -8.2" assistant-help>
-      <a-cylinder position="0 0.85 0" radius="0.2" height="1.1" color="#94a3b8"></a-cylinder>
-      <a-sphere position="0 1.55 0" radius="0.24" color="#dce4ef"></a-sphere>
-      <a-ring position="0 1.55 0.22" radius-inner="0.07" radius-outer="0.12" color="#38bdf8"></a-ring>
-      <a-animation attribute="position" dur="2200" repeat="indefinite"
-        values="0 0 -8.2; 0 0.04 -8.2; 0 0 -8.2"></a-animation>
-    </a-entity>
-    <a-text value="Assistente Virtual"
-            position="0 2.2 -8.2"
-            align="center"
-            color="#7dd3fc"
-            width="3.6"></a-text>
+</a-scene>
 
-    <!-- RIG VR -->
-    <a-entity id="rig" position="0 1.6 -2.5">
-
-      <a-entity camera look-controls position="0 0 0">
-        <a-entity
-          cursor="fuse: true; fuseTimeout: 900"
-          raycaster="objects: .clickable"
-          position="0 0 -1"
-          geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.016"
-          material="color: white; shader: flat">
-        </a-entity>
-      </a-entity>
-
-      <!-- Controles -->
-      <a-entity
-        laser-controls="hand: left"
-        raycaster="objects: .clickable"
-        line="color: #7dd3fc">
-      </a-entity>
-
-      <a-entity
-        laser-controls="hand: right"
-        raycaster="objects: .clickable"
-        line="color: #c4b5fd">
-      </a-entity>
-    </a-entity>
-
-  </a-scene>
-
-  <script>
-    updateCart();
-
-    setTimeout(() => {
-      const okText = document.querySelector('#okText');
-      const okBadge = document.querySelector('#okBadge');
-
-      const oldFinish = document.querySelector('[finish-purchase]');
-      if (oldFinish) {
-        oldFinish.addEventListener('click', () => {
-          if (okBadge) okBadge.setAttribute('visible', 'true');
-          if (okText) okText.setAttribute('visible', 'true');
-
-          setTimeout(() => {
-            if (okBadge) okBadge.setAttribute('visible', 'false');
-            if (okText) okText.setAttribute('visible', 'false');
-          }, 2200);
-        });
-      }
-    }, 500);
-  </script>
 </body>
 </html>
-consegui manda o v5.3, esta certo?
