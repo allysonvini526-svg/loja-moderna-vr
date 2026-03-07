@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Loja Moderna VR - VQ3 Parte 1</title>
+  <title>Loja Moderna VR - VQ3 Parte 2</title>
 
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/aframe-extras@7.5.4/dist/aframe-extras.min.js"></script>
 
   <script>
     let cart = [];
+    let assistantLastMessage = '';
 
     function setText(id, value) {
       const el = document.querySelector(id);
@@ -90,6 +91,68 @@
           setText('#selectedPrice', 'Assistente online');
           showMessage('Assistente virtual ativado.');
         });
+      }
+    });
+
+    AFRAME.registerComponent('assistant-proximity', {
+      init: function () {
+        this.rig = document.querySelector('#rig');
+      },
+      tick: function () {
+        if (!this.rig) return;
+
+        const rigPos = new AFRAME.THREE.Vector3();
+        this.rig.object3D.getWorldPosition(rigPos);
+
+        const assistantPos = new AFRAME.THREE.Vector3();
+        this.el.object3D.getWorldPosition(assistantPos);
+
+        const distance = rigPos.distanceTo(assistantPos);
+        let message = '';
+
+        if (distance < 1.8) {
+          if (rigPos.z > -4.5) {
+            message = 'Bem-vindo a Loja Moderna VR. Explore a entrada e veja nossa vitrine futurista.';
+          } else if (rigPos.z > -8.5) {
+            message = 'Voce esta na area principal. Mire nos produtos e aperte o gatilho para adicionar ao carrinho.';
+          } else {
+            message = 'Voce esta perto do caixa. Fique na area verde para o pagamento facial funcionar.';
+          }
+        }
+
+        if (message && message !== assistantLastMessage) {
+          assistantLastMessage = message;
+          setText('#assistantSpeech', message);
+          setText('#infoTitle', 'Assistente Virtual');
+          setText('#infoBody', message);
+          setText('#selectedPrice', 'Ajuda automatica');
+          showMessage('Assistente: ' + message, 3200);
+        }
+
+        if (!message && assistantLastMessage !== '') {
+          assistantLastMessage = '';
+          setText('#assistantSpeech', 'Aproxime-se para receber orientacoes.');
+        }
+      }
+    });
+
+    AFRAME.registerComponent('assistant-look', {
+      init: function () {
+        this.rig = document.querySelector('#rig');
+      },
+      tick: function () {
+        if (!this.rig) return;
+        const rigPos = new AFRAME.THREE.Vector3();
+        this.rig.object3D.getWorldPosition(rigPos);
+
+        const myPos = new AFRAME.THREE.Vector3();
+        this.el.object3D.getWorldPosition(myPos);
+
+        const dx = rigPos.x - myPos.x;
+        const dz = rigPos.z - myPos.z;
+        const angle = Math.atan2(dx, dz) * 180 / Math.PI;
+
+        this.el.setAttribute('rotation', `0 ${angle} 0`);
       }
     });
 
@@ -274,7 +337,6 @@
 <body>
   <a-scene background="color: #06101a">
 
-    <!-- FUNDO -->
     <a-sky color="#06101a"></a-sky>
 
     <!-- ILUMINACAO -->
@@ -315,12 +377,10 @@
     <!-- PORTA AUTOMATICA -->
     <a-box id="leftDoor" position="-1.02 1.8 2.96" width="1.8" height="3.25" depth="0.04" color="#7dd3fc" opacity="0.18"></a-box>
     <a-box id="rightDoor" position="1.02 1.8 2.96" width="1.8" height="3.25" depth="0.04" color="#c4b5fd" opacity="0.18"></a-box>
-
     <a-box position="0 3.45 2.95" width="4.2" height="0.12" depth="0.1" color="#94a3b8"></a-box>
     <a-box position="-2.05 1.8 2.95" width="0.1" height="3.35" depth="0.1" color="#94a3b8"></a-box>
     <a-box position="2.05 1.8 2.95" width="0.1" height="3.35" depth="0.1" color="#94a3b8"></a-box>
 
-    <!-- ZONA DA PORTA -->
     <a-box position="0 1.6 1.2" width="4.6" height="3.0" depth="2.6" opacity="0" auto-door></a-box>
 
     <!-- LETREIRO -->
@@ -345,7 +405,6 @@
     <a-box id="tvGlowBar" position="0 1.55 2.80" width="3.8" height="0.05" depth="0.04" color="#38bdf8"></a-box>
     <a-box id="tvLine1" position="-1.6 3.32 2.80" width="0.9" height="0.03" depth="0.03" color="#38bdf8"></a-box>
     <a-box id="tvLine2" position="1.6 1.78 2.80" width="0.9" height="0.03" depth="0.03" color="#38bdf8"></a-box>
-
     <a-text id="tvTitle" value="Notebook X-Pro" position="0 2.88 2.70" align="center" color="#ffffff" width="6.2" rotation="0 180 0"></a-text>
     <a-text id="tvBody" value="Alta performance • R$ 8.499" position="0 2.46 2.70" align="center" color="#eef5ff" width="5.2" rotation="0 180 0"></a-text>
     <a-text id="tvSubtitle" value="Potencia com IA integrada" position="0 2.08 2.70" align="center" color="#cbd5e1" width="4.4" rotation="0 180 0"></a-text>
@@ -527,26 +586,38 @@
     </a-box>
     <a-text value="Adicionar" position="7.08 2.26 -7.54" align="center" color="#ffffff" width="1.9"></a-text>
 
-    <!-- ASSISTENTE -->
-    <a-entity class="clickable" position="3.9 0 -6.2"
-      assistant-panel="title: Assistente Virtual; info: Use o analogico esquerdo para andar. Mire com o controle e aperte o gatilho para adicionar produtos ou finalizar a compra.">
+    <!-- ASSISTENTE MAIS INTERATIVO -->
+    <a-entity position="3.9 0 -6.2" assistant-proximity>
+      <a-entity class="clickable"
+        assistant-panel="title: Assistente Virtual; info: Use o analogico esquerdo para andar. Mire com o controle e aperte o gatilho para adicionar produtos ou finalizar a compra."
+        assistant-look>
 
-      <a-cylinder position="0 0.92 0" radius="0.23" height="1.28" color="#9aa8bc"></a-cylinder>
-      <a-sphere position="0 1.75 0" radius="0.28" color="#dce4ef"></a-sphere>
-      <a-ring position="0 1.75 0.26" radius-inner="0.08" radius-outer="0.14" color="#38bdf8"></a-ring>
-      <a-box position="0 1.12 0.24" width="0.26" height="0.11" depth="0.03" color="#8b5cf6"></a-box>
-      <a-cylinder position="-0.28 1.05 0" radius="0.04" height="0.68" color="#9aa8bc" rotation="0 0 35"></a-cylinder>
-      <a-cylinder position="0.28 1.05 0" radius="0.04" height="0.68" color="#9aa8bc" rotation="0 0 -35"></a-cylinder>
-      <a-cylinder position="-0.12 0.30 0" radius="0.05" height="0.80" color="#9aa8bc" rotation="0 0 10"></a-cylinder>
-      <a-cylinder position="0.12 0.30 0" radius="0.05" height="0.80" color="#9aa8bc" rotation="0 0 -10"></a-cylinder>
+        <a-cylinder position="0 0.92 0" radius="0.23" height="1.28" color="#9aa8bc"></a-cylinder>
+        <a-sphere position="0 1.75 0" radius="0.28" color="#dce4ef"></a-sphere>
+        <a-ring position="0 1.75 0.26" radius-inner="0.08" radius-outer="0.14" color="#38bdf8">
+          <a-animation attribute="rotation" dur="1800" repeat="indefinite" to="0 0 360"></a-animation>
+        </a-ring>
+        <a-box position="0 1.12 0.24" width="0.26" height="0.11" depth="0.03" color="#8b5cf6"></a-box>
+        <a-cylinder position="-0.28 1.05 0" radius="0.04" height="0.68" color="#9aa8bc" rotation="0 0 35"></a-cylinder>
+        <a-cylinder position="0.28 1.05 0" radius="0.04" height="0.68" color="#9aa8bc" rotation="0 0 -35"></a-cylinder>
+        <a-cylinder position="-0.12 0.30 0" radius="0.05" height="0.80" color="#9aa8bc" rotation="0 0 10"></a-cylinder>
+        <a-cylinder position="0.12 0.30 0" radius="0.05" height="0.80" color="#9aa8bc" rotation="0 0 -10"></a-cylinder>
 
-      <a-animation attribute="position" dur="2200" repeat="indefinite"
-        values="3.9 0 -6.2; 3.9 0.05 -6.2; 3.9 0 -6.2"></a-animation>
-      <a-animation attribute="rotation" dur="3200" repeat="indefinite"
-        values="0 -7 0; 0 7 0; 0 -7 0"></a-animation>
+        <a-animation attribute="position" dur="2200" repeat="indefinite"
+          values="0 0 0; 0 0.05 0; 0 0 0"></a-animation>
+      </a-entity>
+
+      <a-text value="Assistente Virtual" position="0 2.43 0" align="center" color="#7dd3fc" width="4"></a-text>
+      <a-text value="Toque para receber ajuda" position="0 2.16 0" align="center" color="#cfd9e8" width="3.8"></a-text>
+
+      <a-plane position="0 2.80 0" width="3.8" height="0.92" color="#08111d" opacity="0.92"></a-plane>
+      <a-text id="assistantSpeech"
+        value="Aproxime-se para receber orientacoes."
+        position="0 2.82 0.02"
+        align="center"
+        color="#eef5ff"
+        width="3.5"></a-text>
     </a-entity>
-    <a-text value="Assistente Virtual" position="3.9 2.43 -6.2" align="center" color="#7dd3fc" width="4"></a-text>
-    <a-text value="Toque para receber ajuda" position="3.9 2.16 -6.2" align="center" color="#cfd9e8" width="3.8"></a-text>
 
     <!-- PAINEIS -->
     <a-box position="-5.2 2.18 -12.85" width="5.2" height="2.7" depth="0.06" color="#020617"></a-box>
