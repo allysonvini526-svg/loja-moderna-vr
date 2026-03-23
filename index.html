@@ -1,104 +1,1184 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
-  <meta charset="utf-8">
-  <title>Loja VR Final</title>
-  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Loja Moderna VR - Final Quest</title>
+
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/aframe-extras@7.5.4/dist/aframe-extras.min.js"></script>
+
+  <script>
+    let cart = [];
+    let cartTotal = 0;
+    let lastAssistantState = '';
+    let audioUnlocked = false;
+    let inspectActive = false;
+    let inspectedEl = null;
+    let inspectedOriginal = null;
+    let faceReady = false;
+
+    const productPrices = {
+      "Notebook X-Pro": 8499,
+      "Phone Vision": 5999,
+      "Headphone Neo": 1499,
+      "Earbuds Air": 899,
+      "Speaker Orb": 1299,
+      "Smart Display": 2199,
+      "Mini Phone": 3499,
+      "VR Pod": 3299,
+      "Pulse Buds": 999
+    };
+
+    function formatBRL(value) {
+      return 'R$ ' + value.toLocaleString('pt-BR');
+    }
+
+    function setText(id, value) {
+      const el = document.querySelector(id);
+      if (el) el.setAttribute('value', value);
+    }
+
+    function updateCart() {
+      if (cart.length === 0) {
+        setText('#cartItems', 'Carrinho vazio');
+        setText('#cartCount', '0 itens');
+        setText('#cartTotal', 'Total: R$ 0');
+        setText('#checkoutList', 'Nenhum item selecionado');
+        setText('#checkoutTotal', 'Aproxime-se');
+      } else {
+        setText('#cartItems', cart.join(' • '));
+        setText('#cartCount', cart.length + ' itens');
+        setText('#cartTotal', 'Total: ' + formatBRL(cartTotal));
+        setText('#checkoutList', cart.join(' • '));
+        setText('#checkoutTotal', faceReady ? formatBRL(cartTotal) : 'Aproxime-se');
+      }
+    }
+
+    function showMessage(text, delay = 2200) {
+      const panel = document.querySelector('#globalMessagePanel');
+      const textEl = document.querySelector('#globalMessage');
+      if (!panel || !textEl) return;
+
+      textEl.setAttribute('value', text);
+      panel.setAttribute('visible', 'true');
+
+      clearTimeout(window.__msgTimer);
+      window.__msgTimer = setTimeout(() => {
+        panel.setAttribute('visible', 'false');
+      }, delay);
+    }
+
+    function unlockAudioAndPlayAmbient() {
+      if (audioUnlocked) return;
+      audioUnlocked = true;
+
+      const ambient = document.querySelector('#ambientSound');
+      if (ambient && ambient.components && ambient.components.sound) {
+        try {
+          ambient.components.sound.playSound();
+        } catch (e) {}
+      }
+    }
+
+    function playSound(id) {
+      unlockAudioAndPlayAmbient();
+      const el = document.querySelector(id);
+      if (el && el.components && el.components.sound) {
+        try {
+          el.components.sound.stopSound();
+          el.components.sound.playSound();
+        } catch (e) {}
+      }
+    }
+
+    function inspectProduct(el, name) {
+      if (inspectActive && inspectedEl === el) {
+        returnProduct();
+        return;
+      }
+
+      if (inspectActive && inspectedEl !== el) {
+        returnProduct();
+      }
+
+      const rig = document.querySelector('#rig');
+      if (!rig) return;
+
+      inspectActive = true;
+      inspectedEl = el;
+
+      inspectedOriginal = {
+        parent: el.parentNode,
+        position: Object.assign({}, el.getAttribute('position')),
+        rotation: Object.assign({}, el.getAttribute('rotation') || {x:0,y:0,z:0}),
+        scale: Object.assign({}, el.getAttribute('scale') || {x:1,y:1,z:1})
+      };
+
+      const camera = document.querySelector('#camera');
+      camera.appendChild(el);
+      el.setAttribute('position', '0 -0.05 -1.4');
+      el.setAttribute('rotation', '0 0 0');
+      el.setAttribute('scale', '1.4 1.4 1.4');
+      el.setAttribute('inspect-spin', '');
+      setText('#inspectTitle', name);
+      setText('#inspectHint', 'Clique novamente no produto para devolvê-lo');
+      document.querySelector('#inspectPanel').setAttribute('visible', 'true');
+      showMessage('Modo de exibição ativado: ' + name, 2200);
+      playSound('#clickSound');
+    }
+
+    function returnProduct() {
+      if (!inspectActive || !inspectedEl || !inspectedOriginal) return;
+
+      inspectedEl.removeAttribute('inspect-spin');
+      inspectedOriginal.parent.appendChild(inspectedEl);
+      inspectedEl.setAttribute('position', inspectedOriginal.position);
+      inspectedEl.setAttribute('rotation', inspectedOriginal.rotation);
+      inspectedEl.setAttribute('scale', inspectedOriginal.scale);
+
+      inspectActive = false;
+      inspectedEl = null;
+      inspectedOriginal = null;
+      document.querySelector('#inspectPanel').setAttribute('visible', 'false');
+      showMessage('Produto devolvido.', 1400);
+    }
+
+    AFRAME.registerComponent('inspect-spin', {
+      tick: function (time, delta) {
+        const rot = this.el.getAttribute('rotation');
+        this.el.setAttribute('rotation', {
+          x: rot.x,
+          y: rot.y + (24 * delta / 1000),
+          z: rot.z
+        });
+      }
+    });
+
+    AFRAME.registerComponent('float-rotate', {
+      schema: { yoffset: { default: 0.025 }, speed: { default: 1.0 }, rot: { default: 8 } },
+      init: function () {
+        this.baseY = this.el.object3D.position.y;
+      },
+      tick: function (time, delta) {
+        if (inspectActive && inspectedEl === this.el) return;
+        const p = this.el.object3D.position;
+        p.y = this.baseY + Math.sin(time / 700 * this.data.speed) * this.data.yoffset;
+
+        const r = this.el.getAttribute('rotation');
+        this.el.setAttribute('rotation', {
+          x: r.x,
+          y: r.y + (this.data.rot * delta / 1000),
+          z: r.z
+        });
+      }
+    });
+
+    AFRAME.registerComponent('soft-pulse-light', {
+      schema: { min: { default: 0.05 }, max: { default: 0.16 }, speed: { default: 1.2 } },
+      tick: function (time) {
+        const intensity = this.data.min + ((Math.sin(time / 500 * this.data.speed) + 1) / 2) * (this.data.max - this.data.min);
+        this.el.setAttribute('light', 'intensity', intensity);
+      }
+    });
+
+    AFRAME.registerComponent('product-card', {
+      schema: {
+        product: { type: 'string' },
+        price: { type: 'string' },
+        info: { type: 'string' }
+      },
+      init: function () {
+        this.el.addEventListener('click', () => {
+          unlockAudioAndPlayAmbient();
+          playSound('#clickSound');
+
+          const productName = this.data.product;
+          cart.push(productName);
+          cartTotal += productPrices[productName] || 0;
+
+          updateCart();
+          setText('#infoTitle', productName);
+          setText('#infoBody', this.data.info);
+          setText('#selectedPrice', this.data.price);
+          setText('#checkoutStatus', 'Produto adicionado ao carrinho');
+          showMessage(productName + ' adicionado ao carrinho!');
+        });
+      }
+    });
+
+    AFRAME.registerComponent('inspectable-product', {
+      schema: {
+        name: { type: 'string' }
+      },
+      init: function () {
+        this.el.addEventListener('click', () => {
+          unlockAudioAndPlayAmbient();
+          inspectProduct(this.el, this.data.name);
+        });
+      }
+    });
+
+    AFRAME.registerComponent('assistant-panel', {
+      init: function () {
+        this.el.addEventListener('click', () => {
+          unlockAudioAndPlayAmbient();
+          playSound('#clickSound');
+          const msg = 'Use o analógico esquerdo para andar. Clique nos produtos para adicionar ao carrinho. Os três produtos centrais podem ser exibidos em destaque.';
+          setText('#assistantSpeech', msg);
+          setText('#infoTitle', 'Assistente Virtual');
+          setText('#infoBody', msg);
+          setText('#selectedPrice', 'Assistente online');
+          showMessage('Assistente virtual ativado.');
+        });
+      }
+    });
+
+    AFRAME.registerComponent('assistant-proximity', {
+      init: function () {
+        this.rig = document.querySelector('#rig');
+      },
+      tick: function () {
+        if (!this.rig) return;
+        const rigPos = new AFRAME.THREE.Vector3();
+        const assistantPos = new AFRAME.THREE.Vector3();
+        this.rig.object3D.getWorldPosition(rigPos);
+        this.el.object3D.getWorldPosition(assistantPos);
+        const distance = rigPos.distanceTo(assistantPos);
+
+        let state = '';
+        let message = '';
+
+        if (distance < 2.1) {
+          if (rigPos.z > -4.5) {
+            state = 'entrada';
+            message = 'Bem-vindo à Loja Moderna VR. Entre e explore a vitrine futurista.';
+          } else if (rigPos.z > -8.8) {
+            state = 'produtos';
+            message = 'Você está na área principal. Agora os três produtos centrais podem ser vistos em destaque na vitrine.';
+          } else {
+            state = 'caixa';
+            message = 'Você está perto do caixa. Confira o resumo da compra e finalize com pagamento facial.';
+          }
+        }
+
+        if (state !== '' && state !== lastAssistantState) {
+          lastAssistantState = state;
+          setText('#assistantSpeech', message);
+          setText('#infoTitle', 'Assistente Virtual');
+          setText('#infoBody', message);
+          setText('#selectedPrice', 'Ajuda automática');
+          showMessage('Assistente: ' + message, 3200);
+        }
+
+        if (state === '' && lastAssistantState !== '') {
+          lastAssistantState = '';
+          setText('#assistantSpeech', 'Aproxime-se para receber orientações do assistente virtual.');
+        }
+      }
+    });
+
+    AFRAME.registerComponent('assistant-core-pulse', {
+      tick: function (time) {
+        const scale = 1 + Math.sin(time / 250) * 0.06;
+        this.el.setAttribute('scale', `${scale} ${scale} ${scale}`);
+      }
+    });
+
+    AFRAME.registerComponent('assistant-look', {
+      init: function () {
+        this.rig = document.querySelector('#rig');
+      },
+      tick: function () {
+        if (!this.rig) return;
+        const rigPos = new AFRAME.THREE.Vector3();
+        const myPos = new AFRAME.THREE.Vector3();
+        this.rig.object3D.getWorldPosition(rigPos);
+        this.el.object3D.getWorldPosition(myPos);
+        const dx = rigPos.x - myPos.x;
+        const dz = rigPos.z - myPos.z;
+        const angle = Math.atan2(dx, dz) * 180 / Math.PI;
+        this.el.setAttribute('rotation', `0 ${angle} 0`);
+      }
+    });
+
+    
+
+function refreshCanvasTexture(el) {
+      if (!el) return;
+      const mesh = el.getObject3D && el.getObject3D('mesh');
+      if (mesh && mesh.material && mesh.material.map) mesh.material.map.needsUpdate = true;
+      if (el.components && el.components.material && el.components.material.material && el.components.material.material.map) {
+        el.components.material.material.map.needsUpdate = true;
+      }
+    }
+
+    function vrRoundedRect(ctx, x, y, w, h, r, fill, stroke) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+      if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+      if (stroke) { ctx.strokeStyle = stroke; ctx.stroke(); }
+    }
+
+    function vrDrawDevice(ctx, kind, x, y, w, h, accent) {
+      ctx.save();
+      ctx.translate(x, y);
+      if (kind === 'notebook') {
+        ctx.lineWidth = 8;
+        vrRoundedRect(ctx, 55, 20, w - 110, h - 120, 26, '#08111f', accent);
+        const g = ctx.createLinearGradient(80, 45, w - 80, h - 130);
+        g.addColorStop(0, accent);
+        g.addColorStop(1, '#e9f8ff');
+        vrRoundedRect(ctx, 85, 50, w - 170, h - 180, 18, g, null);
+        vrRoundedRect(ctx, 20, h - 90, w - 40, 45, 18, '#0f172a', accent);
+        vrRoundedRect(ctx, w / 2 - 45, h - 72, 90, 10, 6, accent, null);
+      } else if (kind === 'phone') {
+        ctx.lineWidth = 8;
+        vrRoundedRect(ctx, w / 2 - 105, 18, 210, h - 36, 36, '#06111e', accent);
+        const g = ctx.createLinearGradient(w / 2 - 70, 60, w / 2 + 60, h - 100);
+        g.addColorStop(0, accent);
+        g.addColorStop(1, '#effbff');
+        vrRoundedRect(ctx, w / 2 - 82, 42, 164, h - 104, 24, g, null);
+        vrRoundedRect(ctx, w / 2 - 30, 28, 60, 8, 5, 'rgba(255,255,255,0.5)', null);
+        vrRoundedRect(ctx, w / 2 - 48, h - 76, 96, 16, 8, 'rgba(255,255,255,0.9)', null);
+      } else if (kind === 'headphone') {
+        ctx.lineWidth = 26;
+        ctx.strokeStyle = accent;
+        ctx.beginPath();
+        ctx.arc(w / 2, h / 2 - 30, 135, Math.PI * 1.05, Math.PI * 1.95, false);
+        ctx.stroke();
+        ctx.lineWidth = 8;
+        vrRoundedRect(ctx, w / 2 - 190, h / 2 - 10, 70, 150, 28, '#08111f', accent);
+        vrRoundedRect(ctx, w / 2 + 120, h / 2 - 10, 70, 150, 28, '#08111f', accent);
+        ctx.fillStyle = accent;
+        ctx.globalAlpha = 0.18;
+        ctx.beginPath();
+        ctx.arc(w / 2, h / 2 - 10, 72, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      } else if (kind === 'vr') {
+        ctx.lineWidth = 10;
+        vrRoundedRect(ctx, 80, h / 2 - 70, w - 160, 140, 62, '#08111f', accent);
+        const g = ctx.createLinearGradient(120, h / 2 - 30, 260, h / 2 + 20);
+        g.addColorStop(0, accent);
+        g.addColorStop(1, '#effbff');
+        vrRoundedRect(ctx, 120, h / 2 - 34, 150, 70, 26, g, null);
+        vrRoundedRect(ctx, w - 270, h / 2 - 34, 150, 70, 26, g, null);
+        vrRoundedRect(ctx, w / 2 - 46, h / 2 - 46, 92, 92, 22, '#0f172a', accent);
+        ctx.strokeStyle = accent;
+        ctx.beginPath();
+        ctx.moveTo(60, h / 2);
+        ctx.lineTo(130, h / 2 - 14);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(w - 60, h / 2);
+        ctx.lineTo(w - 130, h / 2 - 14);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function drawTvCanvas(slide) {
+      const canvas = document.getElementById('tvCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      const accent = slide.accent;
+
+      ctx.clearRect(0, 0, w, h);
+      const bg = ctx.createLinearGradient(0, 0, w, h);
+      bg.addColorStop(0, '#061120');
+      bg.addColorStop(1, '#02060d');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.fillStyle = 'rgba(56,189,248,0.08)';
+      ctx.beginPath(); ctx.arc(w - 120, 90, 140, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(w - 40, h - 30, 170, 0, Math.PI * 2); ctx.fill();
+
+      ctx.globalAlpha = 0.24;
+      ctx.lineWidth = 4;
+      vrRoundedRect(ctx, 18, 18, w - 36, h - 36, 24, null, accent);
+      ctx.globalAlpha = 1;
+
+      vrRoundedRect(ctx, 40, 42, 410, h - 84, 22, 'rgba(7,19,34,0.92)', null);
+      vrRoundedRect(ctx, 60, 64, 170, 40, 20, 'rgba(56,189,248,0.18)', accent);
+      ctx.fillStyle = '#eefbff';
+      ctx.textAlign = 'center';
+      ctx.font = '700 24px Arial';
+      ctx.fillText(slide.tag, 145, 91);
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '700 44px Arial';
+      ctx.fillText(slide.title, 60, 165);
+      ctx.fillStyle = '#d8ebf8';
+      ctx.font = '26px Arial';
+      ctx.fillText(slide.subtitle, 60, 205);
+      ctx.fillStyle = accent;
+      ctx.font = '700 18px Arial';
+      ctx.fillText('Destaque da vitrine interativa', 60, 245);
+
+      const line = ctx.createLinearGradient(60, 0, 380, 0);
+      line.addColorStop(0, 'rgba(0,0,0,0)');
+      line.addColorStop(0.5, accent);
+      line.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = line;
+      ctx.fillRect(60, 274, 320, 3);
+
+      const features = [slide.feature1, slide.feature2, slide.feature3];
+      ctx.font = '700 22px Arial';
+      features.forEach((item, i) => {
+        ctx.fillStyle = i === 0 ? '#eef7ff' : '#c9d7ea';
+        ctx.fillText('• ' + item, 72, 338 + (i * 46));
+      });
+
+      vrRoundedRect(ctx, 60, h - 110, 220, 52, 26, 'rgba(56,189,248,0.18)', accent);
+      ctx.fillStyle = '#eefbff';
+      ctx.textAlign = 'center';
+      ctx.font = '700 22px Arial';
+      ctx.fillText('Loja Moderna VR', 170, h - 77);
+
+      vrRoundedRect(ctx, 505, 70, 470, 436, 26, 'rgba(10,18,32,0.95)', 'rgba(56,189,248,0.22)');
+      vrDrawDevice(ctx, slide.kind, 520, 105, 440, 360, accent);
+      ctx.globalAlpha = 0.10;
+      vrRoundedRect(ctx, 520, 105, 440, 360, 24, accent, null);
+      ctx.globalAlpha = 1;
+      vrRoundedRect(ctx, 560, 482, 362, 40, 20, 'rgba(56,189,248,0.16)', null);
+      ctx.fillStyle = '#eefbff';
+      ctx.font = '700 21px Arial';
+      ctx.fillText(slide.price, 741, 508);
+    }
+
+    function drawPosterCanvas(canvasId, config) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+      const bg = ctx.createLinearGradient(0, 0, w, h);
+      bg.addColorStop(0, '#070f1d');
+      bg.addColorStop(1, '#02060d');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, w, h);
+      ctx.lineWidth = 4;
+      vrRoundedRect(ctx, 20, 20, w - 40, h - 40, 28, null, config.accent);
+      ctx.globalAlpha = 0.18;
+      vrRoundedRect(ctx, 34, 34, w - 68, h - 68, 24, config.accent, null);
+      ctx.globalAlpha = 1;
+      vrDrawDevice(ctx, config.kind, 50, 110, w - 100, 260, config.accent);
+      ctx.fillStyle = '#f5f8ff';
+      ctx.textAlign = 'center';
+      ctx.font = '700 32px Arial';
+      ctx.fillText(config.title, w / 2, 72);
+      ctx.fillStyle = '#c8d8e8';
+      ctx.font = '24px Arial';
+      ctx.fillText(config.subtitle, w / 2, h - 48);
+    }
+
+    function drawProductCanvas(canvasId, config) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+      const bg = ctx.createLinearGradient(0, 0, w, h);
+      bg.addColorStop(0, '#07101d');
+      bg.addColorStop(1, '#091425');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, w, h);
+      ctx.lineWidth = 3;
+      vrRoundedRect(ctx, 14, 14, w - 28, h - 28, 24, null, config.accent);
+      vrDrawDevice(ctx, config.kind, 40, 45, w - 80, h - 90, config.accent);
+    }
+
+    AFRAME.registerComponent('display-assets-init', {
+      init: function () {
+        drawPosterCanvas('posterAudioCanvas', { title: 'Coleção Áudio', subtitle: 'Som com estilo futurista', accent: '#8b5cf6', kind: 'headphone' });
+        drawPosterCanvas('posterMobileCanvas', { title: 'Linha Mobile', subtitle: 'Design premium e inovação', accent: '#67e8f9', kind: 'phone' });
+        drawProductCanvas('prodCanvasNotebook', { accent: '#38bdf8', kind: 'notebook' });
+        drawProductCanvas('prodCanvasPhone', { accent: '#67e8f9', kind: 'phone' });
+        drawProductCanvas('prodCanvasHeadphone', { accent: '#a78bfa', kind: 'headphone' });
+
+        setTimeout(() => {
+          refreshCanvasTexture(document.querySelector('#posterAudioFrame'));
+          refreshCanvasTexture(document.querySelector('#posterMobileFrame'));
+          refreshCanvasTexture(document.querySelector('#cardNotebookFrame'));
+          refreshCanvasTexture(document.querySelector('#cardPhoneFrame'));
+          refreshCanvasTexture(document.querySelector('#cardHeadphoneFrame'));
+        }, 400);
+      }
+    });
+
+    AFRAME.registerComponent('face-zone', {
+
+
+      init: function () {
+        this.rig = document.querySelector('#rig');
+        this.active = false;
+      },
+      tick: function () {
+        if (!this.rig) return;
+        const zonePos = new AFRAME.THREE.Vector3();
+        const rigPos = new AFRAME.THREE.Vector3();
+        this.el.object3D.getWorldPosition(zonePos);
+        this.rig.object3D.getWorldPosition(rigPos);
+        const d = zonePos.distanceTo(rigPos);
+
+        const ring = document.querySelector('#scanFloorRing');
+        const status = document.querySelector('#scanStatus');
+        const badge = document.querySelector('#payBadge');
+
+        if (d < 2.05) {
+          faceReady = true;
+          if (!this.active) {
+            this.active = true;
+            if (ring) ring.setAttribute('color', '#22c55e');
+            if (status) status.setAttribute('value', 'Rosto detectado');
+            if (badge) badge.setAttribute('value', 'Autenticação facial pronta');
+            setText('#checkoutStatus', 'Pagamento com reconhecimento facial pronto');
+            if (cart.length > 0) setText('#checkoutTotal', formatBRL(cartTotal));
+            showMessage('Pagamento com reconhecimento facial pronto.');
+          }
+        } else {
+          this.active = false;
+          faceReady = false;
+          if (ring) ring.setAttribute('color', '#86efac');
+          if (status) status.setAttribute('value', 'Fique na área verde para autenticar');
+          if (badge) badge.setAttribute('value', 'Pagamento com reconhecimento facial');
+          setText('#checkoutTotal', 'Aproxime-se');
+        }
+      }
+    });
+
+    AFRAME.registerComponent('finish-purchase', {
+      init: function () {
+        this.el.addEventListener('click', () => {
+          unlockAudioAndPlayAmbient();
+
+          if (cart.length === 0) {
+            playSound('#clickSound');
+            setText('#checkoutStatus', 'Carrinho vazio');
+            showMessage('Seu carrinho está vazio.');
+            return;
+          }
+
+          if (!faceReady) {
+            playSound('#clickSound');
+            setText('#checkoutStatus', 'Faça a autenticação facial');
+            showMessage('Aproxime-se da área verde para autenticar o rosto.');
+            return;
+          }
+
+          playSound('#buySound');
+          setText('#infoTitle', 'Compra aprovada!');
+          setText('#infoBody', 'Itens comprados: ' + cart.join(', '));
+          setText('#selectedPrice', 'Total pago: ' + formatBRL(cartTotal));
+          setText('#checkoutStatus', 'Pagamento concluído com sucesso');
+          showMessage('Compra finalizada com sucesso!');
+
+          const okBadge = document.querySelector('#approvalBadge');
+          const okIcon = document.querySelector('#approvalIcon');
+          const okText = document.querySelector('#approvalText');
+          const ring = document.querySelector('#scanFloorRing');
+          const status = document.querySelector('#scanStatus');
+          const badge = document.querySelector('#payBadge');
+
+          if (okBadge) okBadge.setAttribute('visible', 'true');
+          if (okIcon) okIcon.setAttribute('visible', 'true');
+          if (okText) okText.setAttribute('visible', 'true');
+
+          setTimeout(() => {
+            if (okBadge) okBadge.setAttribute('visible', 'false');
+            if (okIcon) okIcon.setAttribute('visible', 'false');
+            if (okText) okText.setAttribute('visible', 'false');
+          }, 2200);
+
+          cart = [];
+          cartTotal = 0;
+          faceReady = false;
+          if (ring) ring.setAttribute('color', '#86efac');
+          if (status) status.setAttribute('value', 'Fique na área verde para autenticar');
+          if (badge) badge.setAttribute('value', 'Pagamento com reconhecimento facial');
+          updateCart();
+        });
+      }
+    });
+
+    AFRAME.registerComponent('hover-highlight', {
+      schema: { glow: { type: 'selector' } },
+      init: function () {
+        this.el.addEventListener('mouseenter', () => {
+          this.el.setAttribute('scale', '1.06 1.06 1.06');
+          if (this.data.glow) this.data.glow.setAttribute('visible', 'true');
+        });
+
+        this.el.addEventListener('mouseleave', () => {
+          this.el.setAttribute('scale', '1 1 1');
+          if (this.data.glow) this.data.glow.setAttribute('visible', 'false');
+        });
+
+        this.el.addEventListener('click', () => {
+          this.el.setAttribute('animation__pulse', {
+            property: 'scale',
+            from: '1 1 1',
+            to: '1.12 1.12 1.12',
+            dur: 140,
+            dir: 'alternate',
+            loop: 1
+          });
+        });
+      }
+    });
+  </script>
 </head>
 <body>
+  <a-scene background="color: #06101a" fog="type: exponential; color: #07111d; density: 0.024" renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true">
+    <a-assets>
+      <canvas id="tvCanvas" width="1024" height="576"></canvas>
+      <canvas id="posterAudioCanvas" width="720" height="1080"></canvas>
+      <canvas id="posterMobileCanvas" width="720" height="1080"></canvas>
+      <canvas id="prodCanvasNotebook" width="960" height="560"></canvas>
+      <canvas id="prodCanvasPhone" width="960" height="560"></canvas>
+      <canvas id="prodCanvasHeadphone" width="960" height="560"></canvas>
+    </a-assets>
 
-<a-scene>
+    <!-- AUDIOS -->
+    <a-entity id="ambientSound" sound="src: url(https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8d1d09d.mp3?filename=futuristic-atmosphere-ambient-110997.mp3); autoplay: false; loop: true; volume: 0.25"></a-entity>
+    <a-entity id="clickSound" sound="src: url(https://cdn.pixabay.com/download/audio/2022/03/15/audio_7fa882ec58.mp3?filename=click-124467.mp3); autoplay: false; loop: false; volume: 0.6"></a-entity>
+    <a-entity id="buySound" sound="src: url(https://cdn.pixabay.com/download/audio/2022/03/10/audio_9420fd61d6.mp3?filename=success-fanfare-trumpets-6185.mp3); autoplay: false; loop: false; volume: 0.55"></a-entity>
 
-  <!-- Câmera -->
-  <a-entity camera look-controls wasd-controls position="0 1.6 5">
-    <a-cursor></a-cursor>
-  </a-entity>
+    <a-sky color="#06101a"></a-sky>
 
-  <!-- Chão -->
-  <a-plane rotation="-90 0 0" width="20" height="20" color="#0a0a0a"></a-plane>
+    <!-- Atmosfera / teto -->
+    <a-plane position="0 4.98 -5" rotation="90 0 0" width="18.2" height="15.8" color="#050b14" opacity="0.98"></a-plane>
+    <a-box position="0 4.90 -5" width="17.3" height="0.03" depth="14.9" color="#0d1a2d"></a-box>
+    <a-box position="0 4.89 -5" width="13.0" height="0.02" depth="0.08" color="#38bdf8" opacity="0.85"></a-box>
+    <a-box position="0 4.89 -5" width="0.08" height="0.02" depth="11.0" color="#8b5cf6" opacity="0.85"></a-box>
+    <a-ring position="0 4.86 -5" rotation="90 0 0" radius-inner="3.2" radius-outer="3.34" color="#22d3ee" opacity="0.18"></a-ring>
+    <a-ring position="0 4.85 -5" rotation="90 0 0" radius-inner="5.0" radius-outer="5.10" color="#a78bfa" opacity="0.14"></a-ring>
+    <a-sphere position="-7.5 4.6 -11.8" radius="0.04" color="#7dd3fc" opacity="0.85"></a-sphere>
+    <a-sphere position="-5.8 4.2 -8.7" radius="0.03" color="#c4b5fd" opacity="0.80"></a-sphere>
+    <a-sphere position="-3.9 4.4 -2.2" radius="0.03" color="#7dd3fc" opacity="0.75"></a-sphere>
+    <a-sphere position="-1.2 4.5 -12.2" radius="0.04" color="#67e8f9" opacity="0.85"></a-sphere>
+    <a-sphere position="1.8 4.1 -9.3" radius="0.03" color="#c4b5fd" opacity="0.75"></a-sphere>
+    <a-sphere position="3.8 4.55 -3.0" radius="0.03" color="#7dd3fc" opacity="0.82"></a-sphere>
+    <a-sphere position="5.9 4.25 -11.0" radius="0.04" color="#67e8f9" opacity="0.88"></a-sphere>
+    <a-sphere position="7.4 4.45 -6.1" radius="0.03" color="#c4b5fd" opacity="0.82"></a-sphere>
 
-  <!-- Luz -->
-  <a-light type="ambient" intensity="0.6"></a-light>
-  <a-light type="point" position="0 5 5" intensity="1"></a-light>
+    <a-light type="ambient" intensity="0.34" color="#d5e3f5"></a-light>
+    <a-light type="point" intensity="0.18" position="0 4 -4" color="#e5f1ff"></a-light>
+    <a-entity position="-6 4 -2" light="type: point; color: #38bdf8; intensity: 0.16; distance: 18" soft-pulse-light></a-entity>
+    <a-entity position="6 4 -2" light="type: point; color: #8b5cf6; intensity: 0.16; distance: 18" soft-pulse-light="speed: 1.4"></a-entity>
+    <a-entity position="0 4 -10" light="type: point; color: #14b8a6; intensity: 0.12; distance: 14" soft-pulse-light="speed: 1.3"></a-entity>
 
-  <!-- Painel esquerdo -->
-  <a-plane position="-4 2 -3" width="2" height="3" color="#1a1a2e" material="opacity:0.95">
-  </a-plane>
+    <a-entity position="0 4.4 0.8" light="type: spot; color: #e2f3ff; intensity: 0.70; angle: 42; penumbra: 0.35; target: #tvImage"></a-entity>
+    <a-entity position="-7.2 3.6 -8.4" light="type: point; color: #67e8f9; intensity: 0.14; distance: 8"></a-entity>
+    <a-entity position="7.2 3.6 -8.4" light="type: point; color: #c4b5fd; intensity: 0.14; distance: 8"></a-entity>
+    <a-entity position="0 3.8 -11.2" light="type: point; color: #86efac; intensity: 0.11; distance: 7"></a-entity>
 
-  <a-text value="Fone Premium" position="-4 3 -2.9" align="center" color="#ffffff"></a-text>
-  <a-text value="Som com estilo futurista" position="-4 1.2 -2.9" align="center" color="#cccccc" width="3"></a-text>
+    <a-plane position="0 0 3.5" rotation="-90 0 0" width="34" height="20" color="#09111d"></a-plane>
+    <a-plane position="0 0 -5" rotation="-90 0 0" width="22" height="18" color="#0f1726"></a-plane>
+    <a-plane position="0 0.01 -5" rotation="-90 0 0" width="18.5" height="16.2" color="#0d1728"></a-plane>
 
-  <!-- Painel direito -->
-  <a-plane position="4 2 -3" width="2" height="3" color="#1a1a2e" material="opacity:0.95"></a-plane>
+    <!-- Faixas e reflexos do piso -->
+    <a-plane position="0 0.015 -5" rotation="-90 0 0" width="17.0" height="14.6" color="#0b1322" opacity="0.55"></a-plane>
+    <a-box position="0 0.03 1.2" width="5.2" height="0.01" depth="0.06" color="#67e8f9" opacity="0.95"></a-box>
+    <a-box position="0 0.03 0.2" width="3.6" height="0.01" depth="0.06" color="#c4b5fd" opacity="0.78"></a-box>
+    <a-box position="0 0.03 -0.8" width="2.3" height="0.01" depth="0.06" color="#22d3ee" opacity="0.70"></a-box>
+    <a-ring position="0 0.03 1.2" rotation="-90 0 0" radius-inner="0.85" radius-outer="1.08" color="#7dd3fc" opacity="0.16"></a-ring>
+    <a-ring position="0 0.03 -4.45" rotation="-90 0 0" radius-inner="2.95" radius-outer="3.16" color="#38bdf8" opacity="0.09"></a-ring>
+    <a-ring position="0 0.03 -10.9" rotation="-90 0 0" radius-inner="2.7" radius-outer="2.92" color="#86efac" opacity="0.11"></a-ring>
 
-  <a-text value="Linha Mobile" position="4 3 -2.9" align="center" color="#ffffff"></a-text>
-  <a-text value="Design premium e inovação" position="4 1.2 -2.9" align="center" color="#cccccc" width="3"></a-text>
+    <a-box position="0 0.02 -3.8" width="14.5" height="0.01" depth="0.03" color="#38bdf8"></a-box>
+    <a-box position="0 0.02 -6.6" width="14.5" height="0.01" depth="0.03" color="#8b5cf6"></a-box>
+    <a-box position="0 0.02 -9.4" width="14.5" height="0.01" depth="0.03" color="#14b8a6"></a-box>
 
-  <!-- TV CENTRAL FUNCIONAL -->
-  <a-plane position="0 2.5 -4" width="4" height="2.5" color="#111" material="emissive:#222; emissiveIntensity:0.5"></a-plane>
+    <a-plane position="0 5 -5" rotation="90 0 0" width="18.5" height="16.2" color="#0a1322"></a-plane>
+    <a-box position="-4.6 4.94 -5" width="0.10" height="0.04" depth="14.5" color="#38bdf8"></a-box>
+    <a-box position="0 4.94 -5" width="0.10" height="0.04" depth="14.5" color="#8b5cf6"></a-box>
+    <a-box position="4.6 4.94 -5" width="0.10" height="0.04" depth="14.5" color="#14b8a6"></a-box>
 
-  <a-text value="MAIS VENDIDO" position="0 3.2 -3.9" align="center" color="#00ffff" width="4"></a-text>
+    <a-box position="0 2.5 -13.1" width="18.5" height="5" depth="0.24" color="#14294f"></a-box>
+    <a-box position="-9.25 2.5 -5" width="0.24" height="5" depth="16.2" color="#16396d"></a-box>
+    <a-box position="9.25 2.5 -5" width="0.24" height="5" depth="16.2" color="#232f63"></a-box>
+    <a-box position="-9.10 2.45 -5" width="0.03" height="4" depth="14" color="#38bdf8"></a-box>
+    <a-box position="9.10 2.45 -5" width="0.03" height="4" depth="14" color="#8b5cf6"></a-box>
 
-  <a-text value="Fone Gamer Pro" position="0 2.7 -3.9" align="center" color="#ffffff" width="4"></a-text>
+    <a-box position="0 2.5 3.02" width="18.5" height="5" depth="0.22" color="#091321"></a-box>
 
-  <a-text value="Conforto extremo, som imersivo\n e melhor custo-benefício" 
-          position="0 2.2 -3.9" 
-          align="center" 
-          color="#cccccc" 
-          width="3"></a-text>
+    <a-box position="0 3.45 2.95" width="4.2" height="0.12" depth="0.1" color="#94a3b8"></a-box>
+    <a-box position="-2.05 1.8 2.95" width="0.1" height="3.35" depth="0.1" color="#94a3b8"></a-box>
+    <a-box position="2.05 1.8 2.95" width="0.1" height="3.35" depth="0.1" color="#94a3b8"></a-box>
+    <a-box position="0 3.44 2.90" width="4.65" height="0.03" depth="0.03" color="#67e8f9" opacity="0.95"></a-box>
+    <a-box position="-2.00 1.80 2.90" width="0.03" height="3.20" depth="0.03" color="#67e8f9" opacity="0.85"></a-box>
+    <a-box position="2.00 1.80 2.90" width="0.03" height="3.20" depth="0.03" color="#a78bfa" opacity="0.85"></a-box>
+    <a-plane position="0 0.03 2.15" rotation="-90 0 0" width="3.9" height="1.2" color="#0b1322" opacity="0.85"></a-plane>
+    <a-box position="0 0.04 2.15" width="3.2" height="0.01" depth="0.04" color="#22d3ee" opacity="0.78"></a-box>
 
-  <!-- Mesa de produtos -->
-  <a-box position="0 1 -2" depth="1" height="0.2" width="3" color="#111"></a-box>
+    <a-box position="0 4.35 2.86" width="8.9" height="1.02" depth="0.12" color="#020617"></a-box>
+    <a-text value="LOJA MODERNA" position="0 4.22 2.77" align="center" color="#7dd3fc" width="10"></a-text>
+    <a-text value="Tecnologia além do presente" position="0 3.76 2.77" align="center" color="#dce7f7" width="6"></a-text>
 
-  <!-- Produto 1 -->
-  <a-box position="-1 1.3 -2" depth="0.5" height="0.5" width="0.5" color="#6a5acd"
-         class="clickable"
-         onclick="addCarrinho()"></a-box>
+    <a-box position="-3.35 4.22 2.80" width="1.25" height="0.03" depth="0.04" color="#38bdf8" opacity="0.85"></a-box>
+    <a-box position="3.35 4.22 2.80" width="1.25" height="0.03" depth="0.04" color="#a78bfa" opacity="0.85"></a-box>
+    <a-ring position="0 4.05 2.82" radius-inner="0.10" radius-outer="0.16" color="#67e8f9" opacity="0.80"></a-ring>
+    <a-box position="0 0.10 2.84" width="18.5" height="0.02" depth="0.03" color="#1d4ed8" opacity="0.55"></a-box>
 
-  <a-text value="Adicionar" position="-1 0.7 -2" align="center" color="#00ffcc"></a-text>
+    <a-plane position="0 0.02 1.2" rotation="-90 0 0" width="4.8" height="2.8" color="#111827"></a-plane>
+    <a-box position="0 0.03 1.2" width="4.5" height="0.02" depth="2.55" color="#22d3ee"></a-box>
 
-  <!-- Produto 2 -->
-  <a-box position="0 1.3 -2" depth="0.5" height="0.5" width="0.5" color="#00bcd4"
-         class="clickable"
-         onclick="addCarrinho()"></a-box>
+    <a-box position="0 2.5 -12.88" width="9.8" height="3.7" depth="0.03" color="#07101d"></a-box>
+    <a-ring position="0 2.5 -12.80" radius-inner="0.72" radius-outer="1.02" color="#38bdf8"></a-ring>
+    <a-ring position="0 2.5 -12.79" radius-inner="1.20" radius-outer="1.34" color="#8b5cf6"></a-ring>
+    <a-text value="EXPERIÊNCIA IMERSIVA" position="0 4.00 -12.72" align="center" color="#e6eef8" width="7"></a-text>
+    <a-text value="Projeto escolar de realidade virtual" position="0 3.55 -12.72" align="center" color="#9fb2c8" width="5.2"></a-text>
 
-  <a-text value="Adicionar" position="0 0.7 -2" align="center" color="#00ffcc"></a-text>
+    <!-- TV -->
+    <a-entity display-assets-init></a-entity>
+    <a-plane position="0 2.55 2.70" width="7.70" height="3.82" color="#030712" opacity="0.99"></a-plane>
+    <a-plane position="0 2.55 2.71" width="7.38" height="3.48" color="#07101d" opacity="0.99"></a-plane>
+    <a-box position="0 2.55 2.83" width="6.98" height="3.04" depth="0.14" color="#081220"></a-box>
+    <a-ring position="0 2.55 2.835" radius-inner="2.70" radius-outer="2.86" color="#38bdf8" opacity="0.18"></a-ring>
+    <a-box position="0 2.55 2.84" width="6.50" height="2.74" depth="0.10" color="#0b1220"></a-box>
+    <a-plane position="0 2.55 2.855" width="6.18" height="2.42" color="#08111d" opacity="1"></a-plane>
 
-  <!-- Produto 3 -->
-  <a-box position="1 1.3 -2" depth="0.5" height="0.5" width="0.5" color="#ff4081"
-         class="clickable"
-         onclick="addCarrinho()"></a-box>
+    <a-plane position="-1.82 2.56 2.858" width="2.36" height="2.18" color="#091425" opacity="0.98"></a-plane>
+    <a-plane position="-1.82 3.25 2.859" width="1.54" height="0.30" color="#0f2233" opacity="0.95"></a-plane>
+    <a-box position="-2.64 3.25 2.862" width="0.16" height="0.26" depth="0.03" color="#38bdf8"></a-box>
+    <a-text value="MAIS VENDIDO" position="-1.82 3.25 2.91" align="center" color="#ecf8ff" width="2.3"></a-text>
+    <a-text value="Notebook X-Pro" position="-1.82 2.91 2.91" align="center" color="#ffffff" width="3.3"></a-text>
+    <a-text value="O destaque da vitrine por unir potência, mobilidade e visual premium." position="-1.82 2.58 2.91" align="center" color="#d8e8f8" width="2.95"></a-text>
+    <a-plane position="-1.82 2.17 2.86" width="1.62" height="0.28" color="#38bdf8" opacity="0.20"></a-plane>
+    <a-text value="R$ 8.499" position="-1.82 2.18 2.91" align="center" color="#f8fbff" width="2.05"></a-text>
+    <a-text value="Por que ele vende mais?" position="-1.82 1.86 2.91" align="center" color="#7dd3fc" width="2.6"></a-text>
+    <a-text value="• Excelente para estudo, criação e multitarefa" position="-1.82 1.64 2.91" align="center" color="#dce9f8" width="2.6"></a-text>
+    <a-text value="• Tela ampla e experiência mais imersiva" position="-1.82 1.42 2.91" align="center" color="#dce9f8" width="2.6"></a-text>
+    <a-text value="• Acabamento premium que chama atenção" position="-1.82 1.20 2.91" align="center" color="#dce9f8" width="2.6"></a-text>
 
-  <a-text value="Adicionar" position="1 0.7 -2" align="center" color="#00ffcc"></a-text>
+    <a-plane position="1.38 2.56 2.858" width="3.12" height="2.18" color="#0b1424" opacity="1"></a-plane>
+    <a-box position="1.38 2.56 2.862" width="3.28" height="2.32" depth="0.03" color="#38bdf8" opacity="0.12"></a-box>
+    <a-text value="DESEMPENHO" position="0.26 3.22 2.91" align="left" color="#eef8ff" width="1.6"></a-text>
+    <a-plane position="1.65 3.14 2.86" width="1.62" height="0.08" color="#102033" opacity="0.96"></a-plane>
+    <a-plane position="1.38 3.14 2.87" width="1.08" height="0.05" color="#38bdf8" opacity="1"></a-plane>
+    <a-text value="95%" position="2.50 3.22 2.91" align="center" color="#7dd3fc" width="0.9"></a-text>
 
-  <!-- Caixa -->
-  <a-box position="0 1 1" depth="1" height="1" width="2" color="#222"></a-box>
+    <a-text value="VERSATILIDADE" position="0.26 2.74 2.91" align="left" color="#eef8ff" width="1.7"></a-text>
+    <a-plane position="1.65 2.66 2.86" width="1.62" height="0.08" color="#102033" opacity="0.96"></a-plane>
+    <a-plane position="1.30 2.66 2.87" width="0.92" height="0.05" color="#67e8f9" opacity="1"></a-plane>
+    <a-text value="92%" position="2.50 2.74 2.91" align="center" color="#7dd3fc" width="0.9"></a-text>
 
-  <a-text value="Caixa" position="0 1.8 1" align="center" color="#ffffff"></a-text>
+    <a-text value="VISUAL PREMIUM" position="0.26 2.26 2.91" align="left" color="#eef8ff" width="1.7"></a-text>
+    <a-plane position="1.65 2.18 2.86" width="1.62" height="0.08" color="#102033" opacity="0.96"></a-plane>
+    <a-plane position="1.22 2.18 2.87" width="0.84" height="0.05" color="#a78bfa" opacity="1"></a-plane>
+    <a-text value="89%" position="2.50 2.26 2.91" align="center" color="#c4b5fd" width="0.9"></a-text>
 
-  <a-box position="0 1 1" depth="0.5" height="0.5" width="1" color="#00ff00"
-         onclick="finalizarCompra()"></a-box>
+    <a-box position="1.38 1.53 2.862" width="2.90" height="0.62" depth="0.03" color="#0d1a2b"></a-box>
+    <a-text value="Ele representa o melhor equilíbrio entre força, utilidade e design dentro da loja." position="1.38 1.56 2.91" align="center" color="#d9e7f8" width="2.9"></a-text>
 
-  <a-text value="Finalizar compra" position="0 0.5 1" align="center" color="#ffffff"></a-text>
+    <a-box position="-2.92 3.58 2.86" width="1.04" height="0.03" depth="0.03" color="#38bdf8"></a-box>
+    <a-box position="2.90 1.52 2.86" width="1.04" height="0.03" depth="0.03" color="#38bdf8"></a-box>
+    <a-box position="-3.10 3.28 2.86" width="0.16" height="0.16" depth="0.03" color="#38bdf8"></a-box>
+    <a-box position="3.06 1.80 2.86" width="0.16" height="0.16" depth="0.03" color="#38bdf8"></a-box>
+    <a-plane position="0 1.34 2.86" width="4.34" height="0.05" color="#38bdf8" opacity="0.88"></a-plane>
+    <a-text value="Escolhido por unir desempenho, experiência e acabamento premium." position="0 3.72 2.91" align="center" color="#dce9f8" width="5.4"></a-text>
+    <a-text value="Painel de destaque da loja" position="0 1.16 2.91" align="center" color="#eaf4ff" width="3.8"></a-text>
 
-</a-scene>
+    <!-- Painel de inspeção movido para a câmera -->
 
-<script>
-let carrinho = 0;
+    <!-- Pôsteres laterais -->
+    <a-plane position="-9.14 2.22 -3.45" width="1.86" height="2.70" rotation="0 90 0" color="#020617"></a-plane>
+    <a-plane position="-9.11 2.22 -3.45" width="1.64" height="2.38" rotation="0 90 0" color="#070f1c"></a-plane>
+    <a-box position="-9.10 3.58 -3.45" width="0.02" height="0.03" depth="1.42" rotation="0 90 0" color="#8b5cf6" opacity="0.92"></a-box>
+    <a-box position="-9.10 0.86 -3.45" width="0.02" height="0.03" depth="1.42" rotation="0 90 0" color="#8b5cf6" opacity="0.65"></a-box>
+    <a-plane id="posterAudioFrame" position="-9.08 2.24 -3.45" width="1.46" height="2.18" rotation="0 90 0" material="shader: flat; src: #posterAudioCanvas; side: double; transparent: false"></a-plane>
+    <a-text value="Coleção Áudio" position="-9.07 3.48 -3.45" rotation="0 90 0" align="center" color="#f1f5ff" width="3.6"></a-text>
+    <a-text value="Som com estilo futurista" position="-9.07 0.98 -3.45" rotation="0 90 0" align="center" color="#b4c2d9" width="3.2"></a-text>
 
-function addCarrinho(){
-  carrinho++;
-  alert("Item adicionado ao carrinho!");
-}
+    <a-plane position="9.14 2.22 -3.45" width="1.86" height="2.70" rotation="0 -90 0" color="#020617"></a-plane>
+    <a-plane position="9.11 2.22 -3.45" width="1.64" height="2.38" rotation="0 -90 0" color="#070f1c"></a-plane>
+    <a-box position="9.10 3.58 -3.45" width="0.02" height="0.03" depth="1.42" rotation="0 -90 0" color="#67e8f9" opacity="0.92"></a-box>
+    <a-box position="9.10 0.86 -3.45" width="0.02" height="0.03" depth="1.42" rotation="0 -90 0" color="#67e8f9" opacity="0.65"></a-box>
+    <a-plane id="posterMobileFrame" position="9.08 2.24 -3.45" width="1.46" height="2.18" rotation="0 -90 0" material="shader: flat; src: #posterMobileCanvas; side: double; transparent: false"></a-plane>
+    <a-text value="Linha Mobile" position="9.07 3.48 -3.45" rotation="0 -90 0" align="center" color="#f1f5ff" width="3.6"></a-text>
+    <a-text value="Design premium e inovação" position="9.07 0.98 -3.45" rotation="0 -90 0" align="center" color="#b4c2d9" width="3.2"></a-text>
 
-function finalizarCompra(){
-  if(carrinho > 0){
-    alert("Pagamento aprovado por reconhecimento facial!");
-  } else {
-    alert("Carrinho vazio!");
-  }
-}
-</script>
 
+    <!-- MESA -->
+    <a-ring position="0 2.65 -4.45" rotation="90 0 0" radius-inner="2.45" radius-outer="2.60" color="#67e8f9" opacity="0.15"></a-ring>
+    <a-ring position="0 3.08 -4.45" rotation="90 0 0" radius-inner="2.00" radius-outer="2.08" color="#a78bfa" opacity="0.18"></a-ring>
+    <a-box position="-3.20 2.18 -4.45" width="0.03" height="1.35" depth="0.03" color="#38bdf8" opacity="0.55"></a-box>
+    <a-box position="3.20 2.18 -4.45" width="0.03" height="1.35" depth="0.03" color="#a78bfa" opacity="0.55"></a-box>
+    <a-box position="0 2.65 -6.02" width="6.10" height="0.03" depth="0.03" color="#22d3ee" opacity="0.35"></a-box>
+    <a-text value="DEMONSTRAÇÃO PREMIUM" position="0 3.55 -4.45" align="center" color="#dff4ff" width="4.8"></a-text>
+    <a-box position="0 0.74 -4.45" width="7.3" height="1.48" depth="3.1" color="#e7eef8"></a-box>
+    <a-box position="0 1.53 -4.45" width="7.45" height="0.08" depth="3.25" color="#7dd3fc"></a-box>
+    <a-box position="0 1.16 -2.92" width="7.35" height="0.12" depth="0.05" color="#8b5cf6"></a-box>
+    <a-box position="0 0.18 -4.45" width="6.8" height="0.04" depth="2.6" color="#cbd5e1"></a-box>
+
+    <a-circle id="glowNotebook" visible="false" position="-2.45 1.74 -4.45" radius="0.82" color="#38bdf8" opacity="0.20"></a-circle>
+    <a-circle id="glowPhone" visible="false" position="0 1.74 -4.45" radius="0.70" color="#67e8f9" opacity="0.20"></a-circle>
+    <a-circle id="glowHeadphone" visible="false" position="2.45 1.74 -4.45" radius="0.78" color="#a78bfa" opacity="0.20"></a-circle>
+
+    <!-- Cards com fotos dos destaques -->
+    <a-box position="-2.45 2.48 -5.88" width="1.72" height="1.04" depth="0.06" color="#0a1020"></a-box>
+    <a-plane id="cardNotebookFrame" position="-2.45 2.48 -5.84" width="1.55" height="0.90" material="shader: flat; src: #prodCanvasNotebook; side: double; transparent: false"></a-plane>
+    <a-box position="0 2.48 -5.88" width="1.72" height="1.04" depth="0.06" color="#0a1020"></a-box>
+    <a-plane id="cardPhoneFrame" position="0 2.48 -5.84" width="1.55" height="0.90" material="shader: flat; src: #prodCanvasPhone; side: double; transparent: false"></a-plane>
+    <a-box position="2.45 2.48 -5.88" width="1.72" height="1.04" depth="0.06" color="#0a1020"></a-box>
+    <a-plane id="cardHeadphoneFrame" position="2.45 2.48 -5.84" width="1.55" height="0.90" material="shader: flat; src: #prodCanvasHeadphone; side: double; transparent: false"></a-plane>
+
+    <!-- Produto 1 -->
+    <a-ring position="-2.45 1.55 -4.45" rotation="-90 0 0" radius-inner="0.52" radius-outer="0.62" color="#38bdf8" opacity="0.22"></a-ring>
+    <a-cylinder position="-2.45 0.77 -4.45" radius="0.82" height="0.04" color="#0d1728"></a-cylinder>
+    <a-box position="-2.45 1.30 -4.45" width="1.9" height="0.06" depth="1.05" color="#94a3b8"></a-box>
+    <a-entity id="inspectNotebook" position="-2.45 1.55 -4.45" float-rotate inspectable-product="name: Notebook X-Pro">
+      <a-box width="1.24" height="0.06" depth="0.86" color="#334155"></a-box>
+      <a-plane position="0 0.42 -0.24" width="1.10" height="0.70" color="#0f172a" rotation="-35 0 0"></a-plane>
+      <a-plane position="0 0.42 -0.22" width="0.96" height="0.56" color="#38bdf8" rotation="-35 0 0"></a-plane>
+    </a-entity>
+    <a-plane position="-2.45 2.00 -3.08" width="2.15" height="1.00" color="#08111d" opacity="0.96"></a-plane>
+    <a-text value="Notebook X-Pro" position="-2.45 2.26 -2.99" align="center" color="#f8fbff" width="3.0"></a-text>
+    <a-text value="R$ 8.499" position="-2.45 2.06 -2.99" align="center" color="#7dd3fc" width="2.5"></a-text>
+    <a-text value="Clique no produto para ver melhor" position="-2.45 1.86 -2.99" align="center" color="#c7d2e3" width="2.35"></a-text>
+    <a-text value="ou use o botão abaixo" position="-2.45 1.68 -2.99" align="center" color="#9db0c8" width="2.40"></a-text>
+    <a-box position="-2.45 0.52 -2.20" width="1.70" height="0.40" depth="0.38" color="#0f766e"
+      class="clickable"
+      hover-highlight="glow: #glowNotebook"
+      product-card="product: Notebook X-Pro; price: R$ 8.499; info: Notebook com IA integrada, desempenho premium e tela de alta definição para estudo, criação e trabalho.">
+    </a-box>
+    <a-plane position="-2.45 0.55 -1.99" width="1.58" height="0.42" color="#0f766e" opacity="0.01" class="clickable" product-card="product: Notebook X-Pro; price: R$ 8.499; info: Notebook com IA integrada, desempenho premium e tela de alta definição para estudo, criação e trabalho."></a-plane>
+    <a-text value="Adicionar" position="-2.45 0.55 -2.00" align="center" color="#ffffff" width="2.5" class="clickable" product-card="product: Notebook X-Pro; price: R$ 8.499; info: Notebook com IA integrada, desempenho premium e tela de alta definição para estudo, criação e trabalho."></a-text>
+
+    <!-- Produto 2 -->
+    <a-ring position="0 1.55 -4.45" rotation="-90 0 0" radius-inner="0.42" radius-outer="0.52" color="#67e8f9" opacity="0.24"></a-ring>
+    <a-cylinder position="0 0.77 -4.45" radius="0.70" height="0.04" color="#0d1728"></a-cylinder>
+    <a-box position="0 1.30 -4.45" width="1.55" height="0.06" depth="1.05" color="#94a3b8"></a-box>
+    <a-entity id="inspectPhone" position="0 1.53 -4.45" float-rotate="rot: 10" inspectable-product="name: Phone Vision">
+      <a-box width="0.42" height="0.78" depth="0.05" color="#020617"></a-box>
+      <a-plane position="0 0 0.028" width="0.32" height="0.60" color="#67e8f9"></a-plane>
+    </a-entity>
+    <a-plane position="0 2.00 -3.08" width="2.15" height="1.00" color="#08111d" opacity="0.96"></a-plane>
+    <a-text value="Phone Vision" position="0 2.26 -2.99" align="center" color="#f8fbff" width="3.0"></a-text>
+    <a-text value="R$ 5.999" position="0 2.06 -2.99" align="center" color="#7dd3fc" width="2.5"></a-text>
+    <a-text value="Clique no produto para ver melhor" position="0 1.86 -2.99" align="center" color="#c7d2e3" width="2.35"></a-text>
+    <a-text value="ou use o botão abaixo" position="0 1.68 -2.99" align="center" color="#9db0c8" width="2.40"></a-text>
+    <a-box position="0 0.52 -2.20" width="1.70" height="0.40" depth="0.38" color="#1d4ed8"
+      class="clickable"
+      hover-highlight="glow: #glowPhone"
+      product-card="product: Phone Vision; price: R$ 5.999; info: Smartphone futurista com câmera holográfica, visual premium e conectividade inteligente.">
+    </a-box>
+    <a-plane position="0.0 0.55 -1.99" width="1.58" height="0.42" color="#0f766e" opacity="0.01" class="clickable" product-card="product: Phone Vision; price: R$ 5.999; info: Smartphone futurista com câmera holográfica, visual premium e conectividade inteligente."></a-plane>
+    <a-text value="Adicionar" position="0 0.55 -2.00" align="center" color="#ffffff" width="2.5" class="clickable" product-card="product: Phone Vision; price: R$ 5.999; info: Smartphone futurista com câmera holográfica, visual premium e conectividade inteligente."></a-text>
+
+    <!-- Produto 3 -->
+    <a-ring position="2.45 1.55 -4.45" rotation="-90 0 0" radius-inner="0.48" radius-outer="0.58" color="#a78bfa" opacity="0.24"></a-ring>
+    <a-cylinder position="2.45 0.77 -4.45" radius="0.80" height="0.04" color="#0d1728"></a-cylinder>
+    <a-box position="2.45 1.30 -4.45" width="1.9" height="0.06" depth="1.05" color="#94a3b8"></a-box>
+    <a-entity id="inspectHeadphone" position="2.45 1.58 -4.45" float-rotate inspectable-product="name: Headphone Neo">
+      <a-torus radius="0.37" radius-tubular="0.07" color="#475569" rotation="90 0 0"></a-torus>
+      <a-sphere position="-0.26 -0.18 0" radius="0.14" color="#0f172a"></a-sphere>
+      <a-sphere position="0.26 -0.18 0" radius="0.14" color="#0f172a"></a-sphere>
+    </a-entity>
+    <a-plane position="2.45 2.00 -3.08" width="2.15" height="1.00" color="#08111d" opacity="0.96"></a-plane>
+    <a-text value="Headphone Neo" position="2.45 2.26 -2.99" align="center" color="#f8fbff" width="3.0"></a-text>
+    <a-text value="R$ 1.499" position="2.45 2.06 -2.99" align="center" color="#7dd3fc" width="2.5"></a-text>
+    <a-text value="Clique no produto para ver melhor" position="2.45 1.86 -2.99" align="center" color="#c7d2e3" width="2.35"></a-text>
+    <a-text value="ou use o botão abaixo" position="2.45 1.68 -2.99" align="center" color="#9db0c8" width="2.40"></a-text>
+    <a-box position="2.45 0.52 -2.20" width="1.70" height="0.40" depth="0.38" color="#7c3aed"
+      class="clickable"
+      hover-highlight="glow: #glowHeadphone"
+      product-card="product: Headphone Neo; price: R$ 1.499; info: Headphone com áudio imersivo, cancelamento de ruído e design sofisticado para música e VR.">
+    </a-box>
+    <a-plane position="2.45 0.55 -1.99" width="1.58" height="0.42" color="#0f766e" opacity="0.01" class="clickable" product-card="product: Headphone Neo; price: R$ 1.499; info: Headphone com áudio imersivo, cancelamento de ruído e design sofisticado para música e VR."></a-plane>
+    <a-text value="Adicionar" position="2.45 0.55 -2.00" align="center" color="#ffffff" width="2.5" class="clickable" product-card="product: Headphone Neo; price: R$ 1.499; info: Headphone com áudio imersivo, cancelamento de ruído e design sofisticado para música e VR."></a-text>
+
+    <!-- Prateleiras -->
+    <a-box position="-6.4 1.55 -8.4" width="3.52" height="3.42" depth="0.78" color="#121c2d"></a-box>
+    <a-box position="-8.03 1.55 -8.4" width="0.12" height="3.46" depth="0.82" color="#38bdf8" opacity="0.92"></a-box>
+    <a-box position="-4.77 1.55 -8.4" width="0.12" height="3.46" depth="0.82" color="#38bdf8" opacity="0.92"></a-box>
+    <a-box position="-6.4 3.30 -8.4" width="3.52" height="0.10" depth="0.82" color="#223147"></a-box>
+    <a-box position="-6.4 0.20 -8.4" width="3.72" height="0.10" depth="0.98" color="#38bdf8"></a-box>
+    <a-box position="-6.4 1.15 -8.4" width="3.72" height="0.10" depth="0.98" color="#38bdf8"></a-box>
+    <a-box position="-6.4 2.10 -8.4" width="3.72" height="0.10" depth="0.98" color="#38bdf8"></a-box>
+    <a-box position="-6.4 3.05 -8.4" width="3.72" height="0.10" depth="0.98" color="#38bdf8"></a-box>
+    <a-plane position="-6.4 1.64 -8.77" width="3.32" height="3.18" color="#08111d" opacity="0.30"></a-plane>
+    <a-plane position="-6.4 1.64 -7.98" width="3.18" height="3.02" color="#ffffff" opacity="0.04"></a-plane>
+    <a-box position="-6.4 3.48 -8.36" width="2.45" height="0.03" depth="0.03" color="#38bdf8" opacity="0.78"></a-box>
+    <a-text value="ÁREA ÁUDIO" position="-6.4 3.68 -8.4" align="center" color="#7dd3fc" width="4.8"></a-text>
+    <a-image position="-6.4 3.18 -8.02" width="1.50" height="0.78" src="#posterAudioCanvas" material="shader: flat; side: double; transparent: false" opacity="0.96"></a-image>
+
+    <a-box position="-7.08 0.32 -8.4" width="0.70" height="0.08" depth="0.42" color="#334155"></a-box>
+    <a-entity position="-7.08 0.72 -8.4" float-rotate="rot: 6">
+      <a-torus radius="0.18" radius-tubular="0.04" color="#111827" rotation="90 0 0"></a-torus>
+      <a-sphere position="-0.12 -0.09 0" radius="0.07" color="#67e8f9"></a-sphere>
+      <a-sphere position="0.12 -0.09 0" radius="0.07" color="#67e8f9"></a-sphere>
+      <a-box position="0 -0.20 0" width="0.18" height="0.10" depth="0.18" color="#0f172a"></a-box>
+    </a-entity>
+    <a-plane position="-7.08 1.04 -7.68" width="1.62" height="0.78" color="#08111d" opacity="0.94"></a-plane>
+    <a-text value="Earbuds Air" position="-7.08 1.18 -7.58" align="center" color="#eef5ff" width="2.4"></a-text>
+    <a-text value="Sem fio • R$ 899" position="-7.08 0.98 -7.58" align="center" color="#7dd3fc" width="2.2"></a-text>
+    <a-text value="Compacto e leve" position="-7.08 0.80 -7.58" align="center" color="#c7d2e3" width="2.0"></a-text>
+    <a-text value="Uso diário" position="-7.08 0.63 -7.58" align="center" color="#9db0c8" width="1.8"></a-text>
+    <a-box position="-7.08 0.36 -7.70" width="1.15" height="0.26" depth="0.26" color="#0f766e"
+      class="clickable"
+      product-card="product: Earbuds Air; price: R$ 899; info: Fones compactos com conexão rápida, conforto e qualidade sonora para o dia a dia.">
+    </a-box>
+    <a-plane position="-7.08 0.38 -7.53" width="1.58" height="0.42" color="#0f766e" opacity="0.01" class="clickable" product-card="product: Earbuds Air; price: R$ 899; info: Fones compactos com conexão rápida, conforto e qualidade sonora para o dia a dia."></a-plane>
+    <a-text value="Adicionar" position="-7.08 0.38 -7.54" align="center" color="#ffffff" width="1.9" class="clickable" product-card="product: Earbuds Air; price: R$ 899; info: Fones compactos com conexão rápida, conforto e qualidade sonora para o dia a dia."></a-text>
+
+    <a-box position="-6.40 1.27 -8.4" width="0.70" height="0.08" depth="0.42" color="#334155"></a-box>
+    <a-entity position="-6.40 1.60 -8.4" float-rotate="rot: 7">
+      <a-cylinder radius="0.16" height="0.26" color="#020617"></a-cylinder>
+      <a-ring position="0 0.02 0.17" radius-inner="0.06" radius-outer="0.10" color="#38bdf8"></a-ring>
+    </a-entity>
+    <a-plane position="-6.40 1.97 -7.68" width="1.62" height="0.78" color="#08111d" opacity="0.94"></a-plane>
+    <a-text value="Speaker Orb" position="-6.40 2.11 -7.58" align="center" color="#eef5ff" width="2.4"></a-text>
+    <a-text value="R$ 1.299" position="-6.40 1.91 -7.58" align="center" color="#7dd3fc" width="2.0"></a-text>
+    <a-text value="Graves inteligentes" position="-6.40 1.73 -7.58" align="center" color="#c7d2e3" width="2.2"></a-text>
+    <a-text value="Luz integrada" position="-6.40 1.56 -7.58" align="center" color="#9db0c8" width="1.9"></a-text>
+    <a-box position="-6.40 1.30 -7.70" width="1.15" height="0.26" depth="0.26" color="#1d4ed8"
+      class="clickable"
+      product-card="product: Speaker Orb; price: R$ 1.299; info: Caixa de som inteligente com graves marcantes e iluminação integrada.">
+    </a-box>
+    <a-plane position="-6.4 1.32 -7.53" width="1.58" height="0.42" color="#0f766e" opacity="0.01" class="clickable" product-card="product: Speaker Orb; price: R$ 1.299; info: Caixa de som inteligente com graves marcantes e iluminação integrada."></a-plane>
+    <a-text value="Adicionar" position="-6.40 1.32 -7.54" align="center" color="#ffffff" width="1.9" class="clickable" product-card="product: Speaker Orb; price: R$ 1.299; info: Caixa de som inteligente com graves marcantes e iluminação integrada."></a-text>
+
+    <a-box position="-5.72 2.22 -8.4" width="0.70" height="0.08" depth="0.42" color="#334155"></a-box>
+    <a-entity position="-5.72 2.54 -8.4" float-rotate="rot: 6">
+      <a-box width="0.56" height="0.33" depth="0.07" color="#111827"></a-box>
+      <a-plane position="0 0 0.04" width="0.42" height="0.22" color="#67e8f9"></a-plane>
+    </a-entity>
+    <a-plane position="-5.72 2.92 -7.68" width="1.62" height="0.78" color="#08111d" opacity="0.94"></a-plane>
+    <a-text value="Smart Display" position="-5.72 3.06 -7.58" align="center" color="#eef5ff" width="2.4"></a-text>
+    <a-text value="R$ 2.199" position="-5.72 2.86 -7.58" align="center" color="#7dd3fc" width="2.0"></a-text>
+    <a-text value="Tela inteligente" position="-5.72 2.68 -7.58" align="center" color="#c7d2e3" width="2.0"></a-text>
+    <a-text value="Casa conectada" position="-5.72 2.51 -7.58" align="center" color="#9db0c8" width="1.9"></a-text>
+    <a-box position="-5.72 2.24 -7.70" width="1.15" height="0.26" depth="0.26" color="#7c3aed"
+      class="clickable"
+      product-card="product: Smart Display; price: R$ 2.199; info: Tela inteligente para automação, organização e chamadas com visual minimalista.">
+    </a-box>
+    <a-plane position="-5.72 2.26 -7.53" width="1.58" height="0.42" color="#0f766e" opacity="0.01" class="clickable" product-card="product: Smart Display; price: R$ 2.199; info: Tela inteligente para automação, organização e chamadas com visual minimalista."></a-plane>
+    <a-text value="Adicionar" position="-5.72 2.26 -7.54" align="center" color="#ffffff" width="1.9" class="clickable" product-card="product: Smart Display; price: R$ 2.199; info: Tela inteligente para automação, organização e chamadas com visual minimalista."></a-text>
+
+    <a-box position="6.4 1.55 -8.4" width="3.52" height="3.42" depth="0.78" color="#151b31"></a-box>
+    <a-box position="4.77 1.55 -8.4" width="0.12" height="3.46" depth="0.82" color="#a78bfa" opacity="0.92"></a-box>
+    <a-box position="8.03 1.55 -8.4" width="0.12" height="3.46" depth="0.82" color="#a78bfa" opacity="0.92"></a-box>
+    <a-box position="6.4 3.30 -8.4" width="3.52" height="0.10" depth="0.82" color="#241b47"></a-box>
+    <a-box position="6.4 0.20 -8.4" width="3.72" height="0.10" depth="0.98" color="#8b5cf6"></a-box>
+    <a-box position="6.4 1.15 -8.4" width="3.72" height="0.10" depth="0.98" color="#8b5cf6"></a-box>
+    <a-box position="6.4 2.10 -8.4" width="3.72" height="0.10" depth="0.98" color="#8b5cf6"></a-box>
+    <a-box position="6.4 3.05 -8.4" width="3.72" height="0.10" depth="0.98" color="#8b5cf6"></a-box>
+    <a-plane position="6.4 1.64 -8.77" width="3.32" height="3.18" color="#08111d" opacity="0.30"></a-plane>
+    <a-plane position="6.4 1.64 -7.98" width="3.18" height="3.02" color="#ffffff" opacity="0.04"></a-plane>
+    <a-box position="6.4 3.48 -8.36" width="2.45" height="0.03" depth="0.03" color="#a78bfa" opacity="0.78"></a-box>
+    <a-text value="ÁREA MOBILE" position="6.4 3.68 -8.4" align="center" color="#c4b5fd" width="4.8"></a-text>
+    <a-image position="6.4 3.18 -8.02" width="1.50" height="0.78" src="#posterMobileCanvas" material="shader: flat; side: double; transparent: false" opacity="0.96"></a-image>
+
+    <a-box position="5.72 0.32 -8.4" width="0.70" height="0.08" depth="0.42" color="#334155"></a-box>
+    <a-entity position="5.72 0.72 -8.4" float-rotate="rot: 7">
+      <a-box width="0.34" height="0.62" depth="0.08" color="#0f172a"></a-box>
+      <a-plane position="0 0 0.045" width="0.24" height="0.45" color="#67e8f9"></a-plane>
+    </a-entity>
+    <a-plane position="5.72 1.04 -7.68" width="1.62" height="0.78" color="#08111d" opacity="0.94"></a-plane>
+    <a-text value="Mini Phone" position="5.72 1.18 -7.58" align="center" color="#eef5ff" width="2.4"></a-text>
+    <a-text value="R$ 3.499" position="5.72 0.98 -7.58" align="center" color="#7dd3fc" width="2.0"></a-text>
+    <a-text value="Compacto e rápido" position="5.72 0.80 -7.58" align="center" color="#c7d2e3" width="2.1"></a-text>
+    <a-text value="Alta mobilidade" position="5.72 0.63 -7.58" align="center" color="#9db0c8" width="1.9"></a-text>
+    <a-box position="5.72 0.36 -7.70" width="1.15" height="0.26" depth="0.26" color="#0891b2"
+      class="clickable"
+      product-card="product: Mini Phone; price: R$ 3.499; info: Smartphone compacto com alto desempenho e foco em mobilidade.">
+    </a-box>
+    <a-plane position="5.72 0.38 -7.53" width="1.58" height="0.42" color="#0f766e" opacity="0.01" class="clickable" product-card="product: Mini Phone; price: R$ 3.499; info: Smartphone compacto com alto desempenho e foco em mobilidade."></a-plane>
+    <a-text value="Adicionar" position="5.72 0.38 -7.54" align="center" color="#ffffff" width="1.9" class="clickable" product-card="product: Mini Phone; price: R$ 3.499; info: Smartphone compacto com alto desempenho e foco em mobilidade."></a-text>
+
+    <a-box position="6.40 1.27 -8.4" width="0.70" height="0.08" depth="0.42" color="#334155"></a-box>
+    <a-entity position="6.40 1.60 -8.4" float-rotate="rot: 6">
+      <a-box width="0.46" height="0.16" depth="0.24" color="#111827"></a-box>
+      <a-box width="0.58" height="0.10" depth="0.14" position="0 0.10 0" color="#1e293b"></a-box>
+      <a-ring position="-0.18 0 0.13" radius-inner="0.06" radius-outer="0.10" color="#67e8f9"></a-ring>
+      <a-ring position="0.18 0 0.13" radius-inner="0.06" radius-outer="0.10" color="#67e8f9"></a-ring>
+    </a-entity>
+    <a-plane position="6.40 1.97 -7.68" width="1.62" height="0.78" color="#08111d" opacity="0.94"></a-plane>
+    <a-text value="VR Pod" position="6.40 2.11 -7.58" align="center" color="#eef5ff" width="2.4"></a-text>
+    <a-text value="R$ 3.299" position="6.40 1.91 -7.58" align="center" color="#7dd3fc" width="2.0"></a-text>
+    <a-text value="Módulo imersivo" position="6.40 1.73 -7.58" align="center" color="#c7d2e3" width="2.0"></a-text>
+    <a-text value="Realidade virtual" position="6.40 1.56 -7.58" align="center" color="#9db0c8" width="2.0"></a-text>
+    <a-box position="6.40 1.30 -7.70" width="1.15" height="0.26" depth="0.26" color="#1d4ed8"
+      class="clickable"
+      product-card="product: VR Pod; price: R$ 3.299; info: Módulo de realidade virtual portátil para experiências imersivas em qualquer lugar.">
+    </a-box>
+    <a-plane position="6.4 1.32 -7.53" width="1.58" height="0.42" color="#0f766e" opacity="0.01" class="clickable" product-card="product: VR Pod; price: R$ 3.299; info: Módulo de realidade virtual portátil para experiências imersivas em qualquer lugar."></a-plane>
+    <a-text value="Adicionar" position="6.40 1.32 -7.54" align="center" color="#ffffff" width="1.9" class="clickable" product-card="product: VR Pod; price: R$ 3.299; info: Módulo de realidade virtual portátil para experiências imersivas em qualquer lugar."></a-text>
+
+    <a-box position="7.08 2.22 -8.4" width="0.70" height="0.08" depth="0.42" color="#334155"></a-box>
+    <a-entity position="7.08 2.54 -8.4" float-rotate="rot: 7">
+      <a-torus radius="0.18" radius-tubular="0.04" color="#111827" rotation="90 0 0"></a-torus>
+      <a-sphere position="-0.12 -0.09 0" radius="0.07" color="#c4b5fd"></a-sphere>
+      <a-sphere position="0.12 -0.09 0" radius="0.07" color="#c4b5fd"></a-sphere>
+      <a-box position="0 -0.20 0" width="0.18" height="0.10" depth="0.18" color="#0f172a"></a-box>
+    </a-entity>
+    <a-plane position="7.08 2.92 -7.68" width="1.62" height="0.78" color="#08111d" opacity="0.94"></a-plane>
+    <a-text value="Pulse Buds" position="7.08 3.06 -7.58" align="center" color="#eef5ff" width="2.4"></a-text>
+    <a-text value="R$ 999" position="7.08 2.86 -7.58" align="center" color="#7dd3fc" width="2.0"></a-text>
+    <a-text value="Áudio adaptativo" position="7.08 2.68 -7.58" align="center" color="#c7d2e3" width="2.1"></a-text>
+    <a-text value="Resposta rápida" position="7.08 2.51 -7.58" align="center" color="#9db0c8" width="1.9"></a-text>
+    <a-box position="7.08 2.24 -7.70" width="1.15" height="0.26" depth="0.26" color="#7c3aed"
+      class="clickable"
+      product-card="product: Pulse Buds; price: R$ 999; info: Fones sem fio com áudio adaptativo, resposta rápida e design elegante.">
+    </a-box>
+    <a-plane position="7.08 2.26 -7.53" width="1.58" height="0.42" color="#0f766e" opacity="0.01" class="clickable" product-card="product: Pulse Buds; price: R$ 999; info: Fones sem fio com áudio adaptativo, resposta rápida e design elegante."></a-plane>
+    <a-text value="Adicionar" position="7.08 2.26 -7.54" align="center" color="#ffffff" width="1.9" class="clickable" product-card="product: Pulse Buds; price: R$ 999; info: Fones sem fio com áudio adaptativo, resposta rápida e design elegante."></a-text>
+
+    <!-- Robô -->
+    <a-cylinder position="3.9 0.06 -6.2" radius="0.92" height="0.12" color="#0c1626"></a-cylinder>
+    <a-ring position="3.9 0.08 -6.2" rotation="-90 0 0" radius-inner="0.72" radius-outer="0.88" color="#38bdf8" opacity="0.22"></a-ring>
+    <a-ring position="3.9 0.081 -6.2" rotation="-90 0 0" radius-inner="0.54" radius-outer="0.62" color="#a78bfa" opacity="0.20"></a-ring>
+    <a-entity position="3.9 0 -6.2" assistant-proximity>
+      <a-entity class="clickable" assistant-panel assistant-look>
+        <a-cylinder position="0 0.92 0" radius="0.23" height="1.28" color="#9aa8bc"></a-cylinder>
+        <a-sphere position="0 1.75 0" radius="0.28" color="#dce4ef"></a-sphere>
+        <a-ring position="0 1.75 0.26" radius-inner="0.08" radius-outer="0.14" color="#38bdf8">
+          <a-animation attribute="rotation" dur="1800" repeat="indefinite" to="0 0 360"></a-animation>
+        </a-ring>
+        <a-sphere position="0 1.75 0.22" radius="0.05" color="#67e8f9" assistant-core-pulse></a-sphere>
+        <a-box position="0 1.12 0.24" width="0.26" height="0.11" depth="0.03" color="#8b5cf6"></a-box>
+        <a-cylinder position="-0.28 1.05 0" radius="0.04" height="0.68" color="#9aa8bc" rotation="0 0 35"></a-cylinder>
+        <a-cylinder position="0.28 1.05 0" radius="0.04" height="0.68" color="#9aa8bc" rotation="0 0 -35"></a-cylinder>
+        <a-cylinder position="-0.12 0.30 0" radius="0.05" height="0.80" color="#9aa8bc" rotation="0 0 10"></a-cylinder>
+        <a-cylinder position="0.12 0.30 0" radius="0.05" height="0.80" color="#9aa8bc" rotation="0 0 -10"></a-cylinder>
+        <a-animation attribute="position" dur="2200" repeat="indefinite" values="0 0 0; 0 0.05 0; 0 0 0"></a-animation>
+      </a-entity>
+
+      <a-text value="Assistente Virtual" position="0 2.43 0" align="center" color="#7dd3fc" width="4"></a-text>
+      <a-text value="Clique para receber ajuda" position="0 2.16 0" align="center" color="#cfd9e8" width="3.8"></a-text>
+      <a-plane position="0 2.84 0" width="4.0" height="1.00" color="#08111d" opacity="0.94"></a-plane>
+      <a-text id="assistantSpeech" value="Aproxime-se para receber orientações do assistente virtual." position="0 2.86 0.02" align="center" color="#eef5ff" width="3.65"></a-text>
+    </a-entity>
+
+    <!-- Painéis -->
+    <a-box position="-5.2 2.18 -12.85" width="5.2" height="2.7" depth="0.06" color="#020617"></a-box>
+    <a-box position="-5.2 3.22 -12.82" width="4.20" height="0.03" depth="0.03" color="#38bdf8" opacity="0.75"></a-box>
+    <a-plane position="-5.2 2.18 -12.80" width="4.75" height="2.35" color="#08111d" opacity="0.24"></a-plane>
+    <a-text id="infoTitle" value="Bem-vindo" position="-5.2 3.02 -12.74" align="center" color="#7dd3fc" width="4.8"></a-text>
+    <a-text id="infoBody" value="Explore a loja com o analógico, veja os preços e interaja com os produtos e painéis." position="-5.2 2.42 -12.74" align="center" color="#e8eef8" width="4.9"></a-text>
+    <a-text id="selectedPrice" value="Modo VR completo" position="-5.2 1.82 -12.74" align="center" color="#94a3b8" width="3.8"></a-text>
+
+    <a-box position="5.2 2.18 -12.85" width="5.0" height="2.7" depth="0.06" color="#020617"></a-box>
+    <a-box position="5.2 3.22 -12.82" width="3.85" height="0.03" depth="0.03" color="#a78bfa" opacity="0.75"></a-box>
+    <a-plane position="5.2 2.18 -12.80" width="4.55" height="2.35" color="#08111d" opacity="0.24"></a-plane>
+    <a-text value="Carrinho de compras" position="5.2 3.14 -12.74" align="center" color="#c4b5fd" width="4.5"></a-text>
+    <a-text id="cartItems" value="Carrinho vazio" position="5.2 2.62 -12.74" align="center" color="#e8eef8" width="4.6"></a-text>
+    <a-text id="cartCount" value="0 itens" position="5.2 2.10 -12.74" align="center" color="#94a3b8" width="3.4"></a-text>
+    <a-text id="cartTotal" value="Total: R$ 0" position="5.2 1.62 -12.74" align="center" color="#7dd3fc" width="3.8"></a-text>
+
+    <!-- Caixa -->
+    <a-entity position="0 0 -10.9">
+      <a-plane position="0 0.01 0.2" rotation="-90 0 0" width="6.8" height="4.9" color="#07101a" opacity="0.82"></a-plane>
+      <a-box position="-2.75 1.35 1.10" width="0.08" height="2.30" depth="0.08" color="#38bdf8" opacity="0.45"></a-box>
+      <a-box position="2.75 1.35 1.10" width="0.08" height="2.30" depth="0.08" color="#a78bfa" opacity="0.45"></a-box>
+      <a-box position="0 2.55 0.95" width="4.55" height="0.04" depth="0.04" color="#86efac" opacity="0.45"></a-box>
+      <a-box position="0 1.0 0" width="5.4" height="2.4" depth="2.05" color="#0f172a"></a-box>
+      <a-box position="0 2.10 0.82" width="1.75" height="1.08" depth="0.05" color="#020617"></a-box>
+      <a-plane position="0 2.10 0.86" width="1.48" height="0.82" color="#67e8f9"></a-plane>
+
+      <a-box position="0 0.22 0.86" width="3.4" height="0.08" depth="0.05" color="#38bdf8"></a-box>
+
+      <a-text id="payBadge" value="Pagamento com reconhecimento facial" position="0 3.12 0.50" align="center" color="#7dd3fc" width="6"></a-text>
+      <a-text id="scanStatus" value="Fique na área verde para autenticar" position="0 0.38 1.08" align="center" color="#e8eef8" width="5.2"></a-text>
+
+      <a-box position="-2.05 1.28 0.80" width="1.65" height="1.45" depth="0.04" color="#111827"></a-box>
+      <a-text value="Resumo da compra" position="-2.05 1.88 0.92" align="center" color="#c4b5fd" width="2.2"></a-text>
+      <a-text id="checkoutList" value="Nenhum item selecionado" position="-2.05 1.40 0.92" align="center" color="#eef5ff" width="2.15"></a-text>
+      <a-text id="checkoutStatus" value="Aguardando seleção de itens" position="-2.05 0.88 0.92" align="center" color="#94a3b8" width="2.2"></a-text>
+
+      <a-box position="2.05 1.28 0.80" width="1.65" height="1.45" depth="0.04" color="#111827"></a-box>
+      <a-text value="Pagamento seguro" position="2.05 1.88 0.92" align="center" color="#7dd3fc" width="2.2"></a-text>
+      <a-text id="checkoutTotal" value="Aproxime-se" position="2.05 1.40 0.92" align="center" color="#eef5ff" width="2.1"></a-text>
+      <a-text value="Leitura facial com proteção" position="2.05 0.88 0.92" align="center" color="#94a3b8" width="1.9"></a-text>
+
+      <a-ring id="scanFloorRing" position="0 0.03 2.15" rotation="-90 0 0" radius-inner="0.55" radius-outer="0.80" color="#86efac" opacity="0.95"></a-ring>
+      <a-ring position="0 0.031 2.15" rotation="-90 0 0" radius-inner="0.82" radius-outer="0.88" color="#bbf7d0" opacity="0.70"></a-ring>
+      <a-text value="ÁREA DE ESCANEAMENTO" position="0 0.05 1.15" align="center" color="#86efac" width="4.8"></a-text>
+      <a-cylinder position="0 0.9 2.15" radius="0.015" height="1.7" color="#22c55e" opacity="0.45"></a-cylinder>
+
+      <a-box position="0 -0.26 1.02" width="2.85" height="0.54" depth="0.42" color="#0f766e" class="clickable" finish-purchase></a-box>
+      <a-plane position="0 -0.22 1.31" width="2.86" height="0.56" color="#0f766e" opacity="0.10" class="clickable" finish-purchase></a-plane>
+      <a-text value="Finalizar compra" position="0 -0.22 1.33" align="center" color="#ffffff" width="3.8" class="clickable" finish-purchase></a-text>
+
+      <a-box position="-1.82 1.10 0.78" width="0.22" height="1.60" depth="0.08" color="#1d4ed8"></a-box>
+      <a-box position="1.82 1.10 0.78" width="0.22" height="1.60" depth="0.08" color="#8b5cf6"></a-box>
+
+      <a-circle id="approvalBadge" visible="false" position="0 1.18 1.08" radius="0.62" color="#16a34a"></a-circle>
+      <a-text id="approvalIcon" visible="false" value="✓" position="0 1.18 1.14" align="center" color="#ffffff" width="4.4"></a-text>
+      <a-text id="approvalText" visible="false" value="Compra aprovada!" position="0 0.36 1.15" align="center" color="#86efac" width="4.8"></a-text>
+
+      <a-box position="0 1.40 2.15" width="1.9" height="2.4" depth="1.0" opacity="0" face-zone></a-box>
+    </a-entity>
+
+    <!-- Mensagem HUD movida para a câmera -->
+
+    <!-- RIG -->
+    <a-entity id="rig" position="0 1.6 5" movement-controls="speed: 0.20; controls: checkpoint, gamepad, keyboard">
+      <a-entity id="camera" camera look-controls position="0 0 0">
+        <a-entity
+          cursor="fuse: true; fuseTimeout: 900"
+          raycaster="objects: .clickable, [inspectable-product]; far: 18"
+          position="0 0 -1"
+          geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.016"
+          material="color: #ffffff; shader: flat">
+        </a-entity>
+
+        <a-entity id="inspectPanel" visible="false" position="0 0 0">
+          <a-plane position="0 0.62 -1.36" width="3.30" height="0.86" color="#07101b" opacity="0.92"></a-plane>
+          <a-box position="0 0.94 -1.34" width="2.25" height="0.03" depth="0.02" color="#38bdf8" opacity="0.85"></a-box>
+          <a-text id="inspectTitle" value="Produto" position="0 0.76 -1.28" align="center" color="#7dd3fc" width="3.0"></a-text>
+          <a-text id="inspectHint" value="Clique novamente no produto para devolvê-lo" position="0 0.47 -1.28" align="center" color="#eef5ff" width="3.0"></a-text>
+        </a-entity>
+
+        <a-entity id="globalMessagePanel" visible="false">
+          <a-plane position="0 -0.72 -1.55" width="4.45" height="0.34" color="#07101b" opacity="0.88"></a-plane>
+          <a-box position="0 -0.58 -1.53" width="2.10" height="0.02" depth="0.02" color="#22d3ee" opacity="0.72"></a-box>
+          <a-text id="globalMessage" value="" position="0 -0.72 -1.45" align="center" color="#eef5ff" width="4.8"></a-text>
+        </a-entity>
+      </a-entity>
+
+      <a-entity
+        id="leftHand"
+        laser-controls="hand: left"
+        cursor="rayOrigin: entity"
+        raycaster="objects: .clickable, [inspectable-product]; far: 18"
+        line="color: #7dd3fc"
+        thumbstick-controls="target: #rig; speed: 0.20; fly: false">
+      </a-entity>
+
+      <a-entity
+        id="rightHand"
+        laser-controls="hand: right"
+        cursor="rayOrigin: entity"
+        raycaster="objects: .clickable, [inspectable-product]; far: 18"
+        line="color: #c4b5fd">
+      </a-entity>
+    </a-entity>
+  </a-scene>
+
+  <script>
+    updateCart();
+
+    setInterval(() => {
+      setText('#checkoutTotal', cart.length === 0 ? 'Aproxime-se' : formatBRL(cartTotal));
+    }, 200);
+
+    document.addEventListener('click', unlockAudioAndPlayAmbient, { once: true });
+    document.addEventListener('touchstart', unlockAudioAndPlayAmbient, { once: true });
+  </script>
 </body>
 </html>
